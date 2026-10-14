@@ -1,0 +1,331 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>Sequence tools · Martina Castellucci</title>
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="description" content="GC content, ORFs, protein mass and pI, hydropathy, and alignment with the score matrix.">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="style.css">
+  <link rel="stylesheet" href="lab.css">
+  <script defer src="main.js"></script>
+  <script src="lab.js"></script>
+</head>
+<body>
+<header class="topbar">
+  <div class="wrap topbar__inner">
+    <a class="brand" href="index.html"><span class="brand__dot"></span><span>Martina Castellucci · Lab</span></a>
+    <nav class="nav">
+      <button class="nav__toggle" id="navToggle" aria-expanded="false">Menu</button>
+      <ul class="nav__menu" id="navMenu">
+        <li><a class="nav__link" href="index.html">Tools</a></li>
+        <li><a class="nav__link" href="https://github.com/Martinaa1408/lab">GitHub</a></li>
+        <li><a class="nav__link" href="https://martinaa1408.github.io/">My website</a></li>
+      </ul>
+    </nav>
+  </div>
+</header>
+
+<section class="lab-hero">
+  <div class="wrap">
+    <p class="crumb"><a href="index.html">Lab</a> · Bioinformatics</p>
+    <h1>Sequence tools</h1>
+    <p class="subtitle">Properties of a DNA or protein sequence, and pairwise alignment.</p>
+  </div>
+</section>
+
+<section class="section">
+  <div class="wrap">
+<style>
+  .aa-M{ color:var(--lab-good); font-weight:800; } .aa-stop{ color:var(--lab-bad); font-weight:800; }
+  
+
+  .aln{ font-family: ui-monospace, Menlo, Consolas, monospace; font-size:14px; line-height:1.35; white-space:pre; overflow-x:auto; background:#f6f5fb; border:1px solid var(--border); border-radius:12px; padding:12px; }
+</style>
+<div data-tabs>
+  <div class="tabwrap"><div class="tabs__bar pagetabs" role="tablist"><button class="tabs__btn" role="tab" aria-selected="true" aria-controls="t-dna">DNA</button><button class="tabs__btn" role="tab" aria-selected="false" aria-controls="t-prot">Protein</button><button class="tabs__btn" role="tab" aria-selected="false" aria-controls="t-aln">Alignment</button></div></div>
+  <div class="tabs__panel" id="t-dna" role="tabpanel">
+
+    <div class="grid">
+      <div class="col-12 card">
+        <div class="controls" id="ctl">
+          <label class="ctl full" for="seq">DNA sequence (plain or FASTA)
+            <textarea id="seq" spellcheck="false"></textarea></label>
+          <label class="ctl" for="minorf">Minimum ORF length <span class="val" data-for="minorf"></span>
+            <input type="range" id="minorf" min="10" max="200" step="5" value="30" data-unit=" aa"></label>
+          <label class="ctl" for="win">GC window <span class="val" data-for="win"></span>
+            <input type="range" id="win" min="20" max="300" step="10" value="60" data-unit=" bp"></label>
+          <div class="btns"><button class="btn" id="rand" type="button">Random sequence</button></div>
+        </div>
+      <div class="sep"></div>
+        <div class="metrics">
+          <div class="metric"><b id="len"></b><span>Length (bp)</span></div>
+          <div class="metric"><b id="gc"></b><span>GC content</span></div>
+          <div class="metric alt"><b id="norf"></b><span>ORFs</span></div>
+          <div class="metric alt"><b id="tm"></b><span>Melting temperature</span></div>
+        </div>
+        <p style="margin:12px 0 0"><span id="warn" class="tag warn" hidden></span></p>
+      </div>
+      <div class="col-6 card"><h3>GC content</h3><svg id="gcplot"></svg></div>
+      <div class="col-6 card">
+        <h3>ORFs in six frames</h3>
+        <svg id="orfmap"></svg>
+        <h3 style="margin-top:16px">Longest ORF, translated</h3>
+        <div class="box mono" id="prot"></div>
+        <details class="small" style="margin-top:12px"><summary>All ORFs and reverse complement</summary>
+          <div class="scroll" style="margin-top:8px"><table class="data" id="orftab"></table></div>
+          <div class="box mono" id="rc" style="margin-top:10px"></div></details>
+      </div>
+
+    </div>
+  </div>
+  <div class="tabs__panel" id="t-prot" role="tabpanel" hidden>
+
+    <div class="grid">
+      <div class="col-12 card">
+        <div class="controls" id="p-ctl">
+          <label class="ctl full" for="p-seq">Protein sequence (plain or FASTA)
+            <textarea id="p-seq" spellcheck="false"></textarea></label>
+          <label class="ctl" for="p-win">Hydropathy window <span class="val" data-for="p-win"></span>
+            <input type="range" id="p-win" min="5" max="25" step="2" value="19" data-unit=" residues"></label>
+          <div class="btns"><button class="btn" type="button" id="p-ex">Example: insulin</button></div>
+        </div>
+      <div class="sep"></div>
+        <div class="metrics">
+          <div class="metric"><b id="p-len"></b><span>Length (aa)</span></div>
+          <div class="metric"><b id="p-mw"></b><span>Molecular weight</span></div>
+          <div class="metric"><b id="p-pi"></b><span>Isoelectric point</span></div>
+          <div class="metric alt"><b id="p-gravy"></b><span>GRAVY</span></div>
+          <div class="metric alt"><b id="p-ext"></b><span>Extinction coeff. (M⁻¹cm⁻¹)</span></div>
+        </div>
+      </div>
+      <div class="col-6 card">
+        <h3>Hydropathy</h3>
+        <svg id="p-hyd"></svg>
+        <div class="legend"><span><i style="background:#7c5cff"></i>Window average</span><span><i style="background:#d1435b"></i>Possible membrane segment</span></div>
+      </div>
+      <div class="col-6 card">
+        <h3>Composition</h3>
+        <svg id="p-comp"></svg>
+      </div>
+    </div>
+  </div>
+  <div class="tabs__panel" id="t-aln" role="tabpanel" hidden>
+<div class="grid">
+  <div class="col-12 card">
+    <div class="controls" id="a-ctl">
+      <label class="ctl" for="a-a">Sequence A<input type="text" id="a-a" value="HEAGAWGHEE" spellcheck="false"></label>
+      <label class="ctl" for="a-b">Sequence B<input type="text" id="a-b" value="PAWHEAE" spellcheck="false"></label>
+      <label class="ctl">Type
+        <select id="a-type"><option value="prot">Protein (BLOSUM62)</option><option value="dna">DNA</option></select></label>
+      <label class="ctl">Algorithm
+        <select id="a-mode"><option value="global">Global (Needleman-Wunsch)</option><option value="local">Local (Smith-Waterman)</option></select></label>
+      <label class="ctl" for="a-gap">Gap penalty <span class="val" data-for="a-gap"></span>
+        <input type="range" id="a-gap" min="1" max="12" step="1" value="8"></label>
+      <label class="ctl dna" for="a-ma">Match <span class="val" data-for="a-ma"></span><input type="range" id="a-ma" min="1" max="5" step="1" value="2"></label>
+      <label class="ctl dna" for="a-mm">Mismatch <span class="val" data-for="a-mm"></span><input type="range" id="a-mm" min="0" max="5" step="1" value="1"></label>
+      <div class="btns full"><button class="btn" type="button" id="a-exP">Protein example</button><button class="btn" type="button" id="a-exD">DNA example</button></div>
+    </div>
+  <div class="sep"></div>
+    <div class="metrics">
+      <div class="metric"><b id="a-score"></b><span>Score</span></div>
+      <div class="metric"><b id="a-ident"></b><span>Identity</span></div>
+      <div class="metric alt"><b id="a-gaps"></b><span>Gaps</span></div>
+      <div class="metric alt"><b id="a-alen"></b><span>Length</span></div>
+    </div>
+    <div class="aln" id="a-aln" style="margin-top:14px"></div>
+  </div>
+  <div class="col-12 card">
+    <h3>Score matrix and traceback</h3>
+    <div class="scroll"><svg id="a-mat"></svg></div>
+    <p class="small" id="a-matNote"></p>
+  </div>
+</div>
+
+  </div>
+</div>
+<script>
+const CODE = (() => { const b = 'TCAG', aa = 'FFLLSSSSYY**CC*WLLLLPPPPHHQQRRRRIIIMTTTTNNKKSSRRVVVVAAAADDEEGGGG', t = {}; let i = 0;
+  for (const x of b) for (const y of b) for (const z of b) t[x + y + z] = aa[i++]; return t; })();
+const clean = s => s.split('\n').filter(l => !l.startsWith('>')).join('').toUpperCase().replace(/[^ACGTN]/g, '');
+const revcomp = s => s.split('').reverse().map(c => ({ A: 'T', T: 'A', C: 'G', G: 'C' }[c] || 'N')).join('');
+const translate = s => { let p = ''; for (let i = 0; i + 3 <= s.length; i += 3) p += CODE[s.slice(i, i + 3)] || 'X'; return p; };
+function findOrfs(seq, minAa) {
+  const out = [], L = seq.length;
+  [[seq, '+'], [revcomp(seq), '−']].forEach(([s, strand]) => {
+    for (let f = 0; f < 3; f++) {
+      const p = translate(s.slice(f)); let start = -1;
+      for (let i = 0; i < p.length; i++) {
+        if (start < 0 && p[i] === 'M') start = i;
+        if (start >= 0 && p[i] === '*') {
+          if (i - start >= minAa) { const a = f + start * 3, b = f + i * 3 + 3;
+            out.push({ strand, frame: f + 1, start: strand === '+' ? a + 1 : L - b + 1, end: strand === '+' ? b : L - a, aa: i - start, prot: p.slice(start, i) }); }
+          start = -1;
+        }
+      }
+    }
+  });
+  return out.sort((a, b) => b.aa - a.aa);
+}
+(() => {
+const $ = id => document.getElementById(id);
+let seedN = 5;
+function randomSeq() {
+  const r = Lab.rng(seedN++), n = 'ACGT', pick = () => n[Math.floor(r() * 4)];
+  let orf = 'ATG';
+  for (let i = 0; i < 120; i++) { let c; do { c = pick() + pick() + pick(); } while (CODE[c] === '*'); orf += c; }
+  orf += 'TAA';
+  let s = ''; for (let i = 0; i < 500; i++) s += i === 340 ? orf : pick();
+  return '>simulated_sequence\n' + s.match(/.{1,60}/g).join('\n');
+}
+function render() {
+  const seq = clean($('seq').value), L = seq.length, gcN = (seq.match(/[GC]/g) || []).length, at = (seq.match(/[AT]/g) || []).length;
+  $('len').textContent = Lab.int(L); $('gc').textContent = L ? Lab.pct(gcN / (gcN + at || 1)) : '–';
+  $('tm').textContent = !L ? '–' : L < 14 ? (2 * at + 4 * gcN) + ' °C' : Lab.num(64.9 + 41 * (gcN - 16.4) / L, 1) + ' °C';
+  const raw = $('seq').value.split('\n').filter(l => !l.startsWith('>')).join('').replace(/\s/g, ''), bad = raw.replace(/[ACGTNacgtn]/g, '').length;
+  $('warn').hidden = !bad; $('warn').textContent = `${bad} invalid characters ignored`;
+  const w = +$('win').value, pts = [];
+  for (let i = 0; i + w <= L; i += Math.max(1, Math.floor(w / 4))) pts.push([i + w / 2, (seq.slice(i, i + w).match(/[GC]/g) || []).length / w * 100]);
+  Lab.chart($('gcplot'), { series: [{ points: pts.length ? pts : [[0, 0]], color: Lab.C.accent, area: true }, { points: [[0, 50], [Math.max(L, 1), 50]], color: Lab.C.line, dash: '4 4', width: 1 }],
+    xmin: 0, xmax: Math.max(L, 1), ymin: 0, ymax: 100, xlab: 'Position (bp)', ylab: 'GC (%)', height: 260 });
+  const orfs = findOrfs(seq, +$('minorf').value);
+  $('norf').textContent = orfs.length;
+  const svg = $('orfmap'); svg.setAttribute('class', 'chart');
+  const W = Math.round(svg.getBoundingClientRect().width) || 640, lane = 24, H = 6 * lane + 16, ml = 40, X = x => ml + x / Math.max(L, 1) * (W - ml - 10);
+  let s = '';
+  ['+1', '+2', '+3', '−1', '−2', '−3'].forEach((lab, i) => { const y = 6 + i * lane; s += `<text x="4" y="${y + 15}">${lab}</text><line x1="${ml}" x2="${W - 10}" y1="${y + 11}" y2="${y + 11}" class="axis"/>`; });
+  orfs.forEach((o, k) => { const y = 6 + ((o.strand === '+' ? 0 : 3) + o.frame - 1) * lane;
+    s += `<rect x="${X(o.start - 1)}" y="${y + 3}" width="${Math.max(2, X(o.end) - X(o.start - 1))}" height="16" rx="4" fill="${k === 0 ? Lab.C.accent : Lab.C.soft}"><title>${o.aa} aa, ${o.start}–${o.end}</title></rect>`; });
+  svg.setAttribute('viewBox', `0 0 ${W} ${H}`); svg.innerHTML = s;
+  $('orftab').innerHTML = orfs.length ? '<thead><tr><th>Strand</th><th>Frame</th><th>Start</th><th>End</th><th>Amino acids</th></tr></thead><tbody>' +
+    orfs.slice(0, 10).map(o => `<tr><td>${o.strand}</td><td>${o.frame}</td><td>${o.start}</td><td>${o.end}</td><td>${o.aa}</td></tr>`).join('') + '</tbody>'
+    : '<tbody><tr><td>No ORF above the minimum length. Try lowering it.</td></tr></tbody>';
+  $('rc').textContent = revcomp(seq) || '–';
+  $('prot').innerHTML = orfs.length ? orfs[0].prot.replace(/^M/, '<span class="aa-M">M</span>') + '<span class="aa-stop">*</span>' : '–';
+}
+$('rand').addEventListener('click', () => { $('seq').value = randomSeq(); render(); });
+$('seq').value = randomSeq();
+Lab.bindRanges($('ctl'), render);
+})();
+</script>
+
+<script>
+const W_AA = { A: 89.0932, C: 121.1582, D: 133.1027, E: 147.1293, F: 165.1891, G: 75.0666, H: 155.1546, I: 131.1729, K: 146.1876, L: 131.1729, M: 149.2113, N: 132.1179, P: 115.1305, Q: 146.1445, R: 174.201, S: 105.0926, T: 119.1192, V: 117.1463, W: 204.2252, Y: 181.1885 };
+const KD = { A: 1.8, R: -4.5, N: -3.5, D: -3.5, C: 2.5, Q: -3.5, E: -3.5, G: -0.4, H: -3.2, I: 4.5, L: 3.8, K: -3.9, M: 1.9, F: 2.8, P: -1.6, S: -0.8, T: -0.7, W: -0.9, Y: -1.3, V: 4.2 };
+function mw(s) { return [...s].reduce((t, c) => t + W_AA[c], 0) - 18.01528 * (s.length - 1); }
+function isoelectric(s) {
+  const pos = { K: 10.0, R: 12.0, H: 5.98 }, neg = { D: 4.05, E: 4.45, C: 9.0, Y: 10.0 };
+  const nterm = { A: 7.59, M: 7.0, S: 6.93, P: 8.36, T: 6.82, V: 7.44, E: 7.7 }[s[0]] ?? 7.5;
+  const cterm = { D: 4.55, E: 4.75 }[s[s.length - 1]] ?? 3.55;
+  const cnt = c => [...s].filter(x => x === c).length;
+  const charge = ph => {
+    let q = 10 ** nterm / (10 ** nterm + 10 ** ph) - 10 ** ph / (10 ** cterm + 10 ** ph);
+    for (const k in pos) q += cnt(k) * 10 ** pos[k] / (10 ** pos[k] + 10 ** ph);
+    for (const k in neg) q -= cnt(k) * 10 ** ph / (10 ** neg[k] + 10 ** ph);
+    return q;
+  };
+  let lo = 4.05, hi = 12, ph = 7.775;
+  if (charge(lo) < 0) { for (let i = 0; i < 1000 && charge(lo) < 0; i++) lo -= 1; }
+  if (charge(hi) > 0) { for (let i = 0; i < 1000 && charge(hi) > 0; i++) hi += 1; }
+  for (let i = 0; i < 200; i++) { ph = (lo + hi) / 2; if (charge(ph) > 0) lo = ph; else hi = ph; if (hi - lo < 1e-4) break; }
+  return ph;
+}
+(() => {
+const $ = id => document.getElementById(id);
+const EX = '>sp|P01308|INS_HUMAN Insulin\nMALWMRLLPLLALLALWGPDPAAAFVNQHLCGSHLVEALYLVCGERGFFYTPKTRREAEDLQVGQVELGGGPGAGSLQPLALEGSLQKRGIVEQCCTSICSLYQLENYCN';
+function render() {
+  const s = $('p-seq').value.split('\n').filter(l => !l.startsWith('>')).join('').toUpperCase().replace(/[^ACDEFGHIKLMNPQRSTVWY]/g, '');
+  if (!s) return;
+  const n = s.length, cnt = c => [...s].filter(x => x === c).length;
+  $('p-len').textContent = n; $('p-mw').textContent = Lab.num(mw(s) / 1000, 2) + ' kDa'; $('p-pi').textContent = Lab.num(isoelectric(s), 2);
+  $('p-gravy').textContent = Lab.num([...s].reduce((t, c) => t + KD[c], 0) / n, 3);
+  const e = 5500 * cnt('W') + 1490 * cnt('Y'), ec = e + 125 * Math.floor(cnt('C') / 2);
+  $('p-ext').textContent = `${Lab.int(e)}–${Lab.int(ec)}`;
+  const w = Math.min(+$('p-win').value, n), pts = [];
+  for (let i = 0; i + w <= n; i++) pts.push([i + (w + 1) / 2, [...s.slice(i, i + w)].reduce((t, c) => t + KD[c], 0) / w]);
+  const tm = []; let run = null;
+  pts.forEach(p => { if (p[1] >= 1.6) { if (!run) run = { x0: p[0] }; run.x1 = p[0]; } else if (run) { tm.push(run); run = null; } }); if (run) tm.push(run);
+  Lab.chart($('p-hyd'), { series: [{ points: pts.length ? pts : [[0, 0]], color: Lab.C.accent }], bands: tm.map(r => ({ x0: r.x0, x1: r.x1, color: Lab.C.bad, opacity: 0.12 })),
+    hlines: [{ y: 1.6, color: Lab.C.bad }, { y: 0, color: Lab.C.line }], xmin: 0, xmax: n, ymin: -4.5, ymax: 4.5, xlab: 'Residue position', ylab: 'Hydropathy', height: 260 });
+  const aas = 'AVILMFWCGPSTYNQHKRDE';
+  Lab.bars($('p-comp'), { labels: [...aas], series: [{ values: [...aas].map(a => cnt(a) / n * 100), color: Lab.C.second }], ylab: '% of residues', yfmt: v => Lab.num(v, 0), height: 260 });
+}
+$('p-ex').addEventListener('click', () => { $('p-seq').value = EX; render(); });
+$('p-seq').value = EX;
+Lab.bindRanges($('p-ctl'), render);
+})();
+</script>
+
+<script>
+const AA = 'ARNDCQEGHILKMFPSTWYV';
+const B62 = (() => { const v = '4,-1,-2,-2,0,-1,-1,0,-2,-1,-1,-1,-1,-2,-1,1,0,-3,-2,0,-1,5,0,-2,-3,1,0,-2,0,-3,-2,2,-1,-3,-2,-1,-1,-3,-2,-3,-2,0,6,1,-3,0,0,0,1,-3,-3,0,-2,-3,-2,1,0,-4,-2,-3,-2,-2,1,6,-3,0,2,-1,-1,-3,-4,-1,-3,-3,-1,0,-1,-4,-3,-3,0,-3,-3,-3,9,-3,-4,-3,-3,-1,-1,-3,-1,-2,-3,-1,-1,-2,-2,-1,-1,1,0,0,-3,5,2,-2,0,-3,-2,1,0,-3,-1,0,-1,-2,-1,-2,-1,0,0,2,-4,2,5,-2,0,-3,-3,1,-2,-3,-1,0,-1,-3,-2,-2,0,-2,0,-1,-3,-2,-2,6,-2,-4,-4,-2,-3,-3,-2,0,-2,-2,-3,-3,-2,0,1,-1,-3,0,0,-2,8,-3,-3,-1,-2,-1,-2,-1,-2,-2,2,-3,-1,-3,-3,-3,-1,-3,-3,-4,-3,4,2,-3,1,0,-3,-2,-1,-3,-1,3,-1,-2,-3,-4,-1,-2,-3,-4,-3,2,4,-2,2,0,-3,-2,-1,-2,-1,1,-1,2,0,-1,-3,1,1,-2,-1,-3,-2,5,-1,-3,-1,0,-1,-3,-2,-2,-1,-1,-2,-3,-1,0,-2,-3,-2,1,2,-1,5,0,-2,-1,-1,-1,-1,1,-2,-3,-3,-3,-2,-3,-3,-3,-1,0,0,-3,0,6,-4,-2,-2,1,3,-1,-1,-2,-2,-1,-3,-1,-1,-2,-2,-3,-3,-1,-2,-4,7,-1,-1,-4,-3,-2,1,-1,1,0,-1,0,0,0,-1,-2,-2,0,-1,-2,-1,4,1,-3,-2,-2,0,-1,0,-1,-1,-1,-1,-2,-2,-1,-1,-1,-1,-2,-1,1,5,-2,-2,0,-3,-3,-4,-4,-2,-2,-3,-2,-2,-3,-2,-3,-1,1,-4,-3,-2,11,2,-3,-2,-2,-2,-3,-2,-1,-2,-3,2,-1,-1,-2,-1,3,-3,-2,-2,2,7,-1,0,-3,-3,-3,-1,-2,-2,-3,-3,3,1,-2,1,-1,-2,-2,0,-3,-1,4'.split(',').map(Number);
+  const m = {}; for (let i = 0; i < 20; i++) for (let j = 0; j < 20; j++) m[AA[i] + AA[j]] = v[i * 20 + j]; return m; })();
+function align(a, b, opt) {
+  const n = a.length, m = b.length, local = opt.mode === 'local', g = opt.gap;
+  const sc = (x, y) => opt.type === 'prot' ? (B62[x + y] ?? -4) : (x === y ? opt.ma : -opt.mm);
+  const S = Array.from({ length: n + 1 }, () => new Array(m + 1).fill(0));
+  for (let i = 1; i <= n; i++) S[i][0] = local ? 0 : -g * i;
+  for (let j = 1; j <= m; j++) S[0][j] = local ? 0 : -g * j;
+  let best = [n, m];
+  for (let i = 1; i <= n; i++) for (let j = 1; j <= m; j++) {
+    let v = Math.max(S[i - 1][j - 1] + sc(a[i - 1], b[j - 1]), S[i - 1][j] - g, S[i][j - 1] - g);
+    S[i][j] = local ? Math.max(0, v) : v;
+  }
+  if (local) { let bi = 0, bj = 0; for (let i = 0; i <= n; i++) for (let j = 0; j <= m; j++) if (S[i][j] > S[bi][bj]) { bi = i; bj = j; } best = [bi, bj]; }
+  let [i, j] = best, A = '', B = '';
+  const path = [[i, j]];
+  while (local ? (i > 0 && j > 0 && S[i][j] > 0) : (i > 0 || j > 0)) {
+    if (i > 0 && j > 0 && S[i][j] === S[i - 1][j - 1] + sc(a[i - 1], b[j - 1])) { A = a[i - 1] + A; B = b[j - 1] + B; i--; j--; }
+    else if (i > 0 && S[i][j] === S[i - 1][j] - g) { A = a[i - 1] + A; B = '-' + B; i--; }
+    else { A = '-' + A; B = b[j - 1] + B; j--; }
+    path.push([i, j]);
+  }
+  return { S, A, B, score: S[best[0]][best[1]], path, sc };
+}
+(() => {
+const $ = id => document.getElementById(id);
+function render() {
+  const type = $('a-type').value, clean = s => s.toUpperCase().replace(type === 'prot' ? /[^ARNDCQEGHILKMFPSTWYV]/g : /[^ACGT]/g, '');
+  document.querySelectorAll('.dna').forEach(e => e.hidden = type === 'prot');
+  const a = clean($('a-a').value).slice(0, 400), b = clean($('a-b').value).slice(0, 400);
+  if (!a || !b) { $('a-aln').textContent = 'Enter two valid sequences.'; return; }
+  const r = align(a, b, { type, mode: $('a-mode').value, gap: +$('a-gap').value, ma: +$('a-ma').value, mm: +$('a-mm').value });
+  let mid = '', idn = 0, gp = 0;
+  for (let k = 0; k < r.A.length; k++) {
+    const x = r.A[k], y = r.B[k];
+    if (x === '-' || y === '-') { mid += ' '; gp++; } else if (x === y) { mid += '|'; idn++; } else mid += r.sc(x, y) > 0 && type === 'prot' ? ':' : ' ';
+  }
+  $('a-score').textContent = r.score; $('a-ident').textContent = r.A.length ? `${idn}/${r.A.length} (${Lab.pct(idn / r.A.length, 0)})` : '–';
+  $('a-gaps').textContent = gp; $('a-alen').textContent = r.A.length;
+  let out = '';
+  for (let k = 0; k < r.A.length; k += 60) out += `A  ${r.A.slice(k, k + 60)}\n   ${r.B.length ? mid.slice(k, k + 60) : ''}\nB  ${r.B.slice(k, k + 60)}\n\n`;
+  $('a-aln').textContent = out.trim() || 'No local alignment with a positive score.';
+  const svg = $('a-mat'), n = a.length, m = b.length;
+  if (n > 45 || m > 45) { svg.innerHTML = ''; svg.removeAttribute('viewBox'); $('a-matNote').textContent = 'The matrix is drawn for sequences up to 45 residues.'; return; }
+  $('a-matNote').textContent = 'Each cell holds the best score of an alignment ending there. Filled cells: the traceback.';
+  const c = 26, W = (m + 2) * c, H = (n + 2) * c, vals = r.S.flat(), lo = Math.min(...vals), hi = Math.max(...vals);
+  const onPath = new Set(r.path.map(p => p.join(',')));
+  let s = '';
+  for (let j = 0; j < m; j++) s += `<text x="${(j + 2.5) * c}" y="${c * 0.7}" text-anchor="middle" font-weight="700">${b[j]}</text>`;
+  for (let i = 0; i < n; i++) s += `<text x="${c * 0.5}" y="${(i + 2.65) * c}" text-anchor="middle" font-weight="700">${a[i]}</text>`;
+  for (let i = 0; i <= n; i++) for (let j = 0; j <= m; j++) {
+    const v = r.S[i][j], t = (v - lo) / (hi - lo || 1), p = onPath.has(i + ',' + j);
+    s += `<rect x="${(j + 1) * c}" y="${(i + 1) * c}" width="${c - 1}" height="${c - 1}" rx="3" fill="${p ? '#7c5cff' : `rgba(124,92,255,${0.06 + 0.4 * t})`}"/>`;
+    s += `<text x="${(j + 1.5) * c - 0.5}" y="${(i + 1.62) * c}" text-anchor="middle" style="font-size:10px;fill:${p ? '#fff' : '#3b3d46'}">${v}</text>`;
+  }
+  svg.setAttribute('viewBox', `0 0 ${W} ${H}`); svg.setAttribute('class', 'chart');
+  svg.style.width = Math.min(W, 900) + 'px'; svg.style.maxWidth = 'none'; svg.innerHTML = s;
+}
+$('a-exP').addEventListener('click', () => { $('a-type').value = 'prot'; $('a-a').value = 'HEAGAWGHEE'; $('a-b').value = 'PAWHEAE'; $('a-gap').value = 8; $('a-gap').dispatchEvent(new Event('input')); });
+$('a-exD').addEventListener('click', () => { $('a-type').value = 'dna'; $('a-a').value = 'GATTACAGATTACA'; $('a-b').value = 'GCATGCGATTAC'; $('a-gap').value = 2; $('a-gap').dispatchEvent(new Event('input')); });
+Lab.bindRanges($('a-ctl'), render);
+})();
+</script>
+
+<details class="method"><summary>Method and data</summary><p>DNA: standard genetic code (NCBI table 1); an ORF runs from ATG to the first in-frame stop codon on both strands. Melting temperature by the Wallace rule below 14 bp and by the GC formula above. Protein: average residue masses minus one water per peptide bond; pI by bisection with Bjellqvist-type pK values; extinction coefficient = 5500·W + 1490·Y, plus 125 per cystine pair; Kyte-Doolittle hydropathy. Protein values match Biopython. The protein example is human insulin, UniProt P01308. Alignment: Linear gap penalty; end gaps are penalised in global mode. Ties in the traceback prefer the diagonal. The protein pair is the classic example from Durbin et al., Biological Sequence Analysis, which scores it with BLOSUM50, so the book's numbers differ. Scores match Biopython's PairwiseAligner.</p></details>
+
+    <footer>© 2026 Martina Castellucci · <a href="https://martinaa1408.github.io/">martinaa1408.github.io</a></footer>
+  </div>
+</section>
+</body>
+</html>

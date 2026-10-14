@@ -2,9 +2,9 @@
 <html lang="en">
 <head>
   <meta charset="utf-8">
-  <title>Diagnostic test • Martina Castellucci Lab</title>
+  <title>Diagnostic test · Martina Castellucci</title>
   <meta name="viewport" content="width=device-width,initial-scale=1">
-  <meta name="description" content="Sensitivity, specificity and prevalence turned into predictive values, with a 500-person picture.">
+  <meta name="description" content="Predictive values from sensitivity, specificity and prevalence; ROC curve and cut-off.">
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="style.css">
   <link rel="stylesheet" href="lab.css">
@@ -18,12 +18,9 @@
     <nav class="nav">
       <button class="nav__toggle" id="navToggle" aria-expanded="false">Menu</button>
       <ul class="nav__menu" id="navMenu">
-        <li><a class="nav__link" href="index.html#bio">Bioinformatics</a></li>
-        <li><a class="nav__link" href="index.html#clinical">Clinical statistics</a></li>
-        <li><a class="nav__link" href="index.html#ai">AI</a></li>
-        <li><a class="nav__link" href="index.html#food">Food safety</a></li>
-        <li><a class="nav__link" href="index.html#school">Teaching</a></li>
-        <li><a class="nav__link" href="https://martinaa1408.github.io/">My website ↗</a></li>
+        <li><a class="nav__link" href="index.html">Tools</a></li>
+        <li><a class="nav__link" href="https://github.com/Martinaa1408/lab">GitHub</a></li>
+        <li><a class="nav__link" href="https://martinaa1408.github.io/">My website</a></li>
       </ul>
     </nav>
   </div>
@@ -31,9 +28,9 @@
 
 <section class="lab-hero">
   <div class="wrap">
-    <p class="crumb"><a href="index.html">Lab</a> / <a href="index.html#clinical">Clinical statistics</a></p>
-    <h1>How much can you trust a positive test?</h1>
-    <p class="subtitle">The same test gives very different answers depending on how common the disease is in the people tested. Move the sliders and watch the predictive values change.</p>
+    <p class="crumb"><a href="index.html">Lab</a> · Healthcare data</p>
+    <h1>Diagnostic test</h1>
+    <p class="subtitle">How far to trust a positive result, and where to set the cut-off of a biomarker.</p>
   </div>
 </section>
 
@@ -45,68 +42,97 @@
   .tp{ background:var(--lab-bad); } .fn{ border:2px solid var(--lab-bad); } .fp{ background:var(--lab-warn); } .tn{ background:#e4e2ee; }
   .key{ display:flex; flex-wrap:wrap; gap:14px; font-size:13px; color:var(--muted); margin-top:12px; }
   .key i{ width:11px; height:11px; border-radius:50%; display:inline-block; vertical-align:-1px; margin-right:6px; }
+  
 </style>
-<div class="tool">
-  <div class="card" id="ctl">
-    <div class="btns" style="margin-bottom:16px">
-      <button class="btn" type="button" data-p="1" data-se="98" data-sp="99">Rare-disease screening</button>
-      <button class="btn" type="button" data-p="20" data-se="85" data-sp="90">Outpatient clinic</button>
-      <button class="btn" type="button" data-p="50" data-se="85" data-sp="90">Symptomatic patient</button>
-    </div>
-    <label class="ctl" for="prev">Prevalence <span class="val" data-for="prev"></span>
-      <small>Share of tested people who have the disease</small>
-      <input type="range" id="prev" min="0.1" max="60" step="0.1" value="5" data-unit="%"></label>
-    <label class="ctl" for="se">Sensitivity <span class="val" data-for="se"></span>
-      <small>Sick people the test detects</small>
-      <input type="range" id="se" min="50" max="100" step="0.5" value="90" data-unit="%"></label>
-    <label class="ctl" for="sp">Specificity <span class="val" data-for="sp"></span>
-      <small>Healthy people the test correctly calls negative</small>
-      <input type="range" id="sp" min="50" max="100" step="0.5" value="92" data-unit="%"></label>
-    <label class="ctl" for="n">People tested
-      <input type="number" id="n" min="100" max="1000000" step="100" value="10000"></label>
-  </div>
-  <div class="stack">
-    <div class="card">
-      <p class="headline" id="headline"></p>
-      <div class="metrics">
-        <div class="metric"><b id="ppv"></b><span>Positive predictive value</span></div>
-        <div class="metric"><b id="npv"></b><span>Negative predictive value</span></div>
-        <div class="metric alt"><b id="lrp"></b><span>Positive likelihood ratio</span></div>
-        <div class="metric alt"><b id="lrn"></b><span>Negative likelihood ratio</span></div>
+<div data-tabs>
+  <div class="tabwrap"><div class="tabs__bar pagetabs" role="tablist">
+    <button class="tabs__btn" role="tab" aria-selected="true" aria-controls="t-pv">Predictive values</button>
+    <button class="tabs__btn" role="tab" aria-selected="false" aria-controls="t-roc">Cut-off and ROC</button>
+  </div></div>
+
+  <div class="tabs__panel" id="t-pv" role="tabpanel">
+    <div class="grid">
+      <div class="col-12 card">
+        <div class="controls" id="ctl">
+          <label class="ctl" for="prev">Prevalence <span class="val" data-for="prev"></span>
+            <input type="range" id="prev" min="0.1" max="60" step="0.1" value="5" data-unit="%"></label>
+          <label class="ctl" for="se">Sensitivity <span class="val" data-for="se"></span>
+            <input type="range" id="se" min="50" max="100" step="0.5" value="90" data-unit="%"></label>
+          <label class="ctl" for="sp">Specificity <span class="val" data-for="sp"></span>
+            <input type="range" id="sp" min="50" max="100" step="0.5" value="92" data-unit="%"></label>
+          <div class="btns full">
+            <button class="btn" type="button" data-p="1" data-se="98" data-sp="99">Screening</button>
+            <button class="btn" type="button" data-p="20" data-se="85" data-sp="90">Outpatient clinic</button>
+            <button class="btn" type="button" data-p="50" data-se="85" data-sp="90">Patient with symptoms</button>
+          </div>
+        </div>
+      <div class="sep"></div>
+        <p class="headline" id="headline"></p>
+        <div class="metrics">
+          <div class="metric"><b id="ppv"></b><span>Positive predictive value</span></div>
+          <div class="metric"><b id="npv"></b><span>Negative predictive value</span></div>
+          <div class="metric alt"><b id="lrp"></b><span>LR+</span></div>
+          <div class="metric alt"><b id="lrn"></b><span>LR−</span></div>
+        </div>
+      </div>
+      <div class="col-6 card">
+        <h3>500 people tested</h3>
+        <div class="icons" id="icons" role="img"></div>
+        <div class="key"><span><i class="tp"></i>Sick, positive</span><span><i class="fn"></i>Sick, negative</span><span><i class="fp"></i>Healthy, positive</span><span><i class="tn"></i>Healthy, negative</span></div>
+      </div>
+      <div class="col-6 card">
+        <h3>Predictive values and prevalence</h3>
+        <svg id="curve"></svg>
+        <div class="legend"><span><i style="background:#7c5cff"></i>PPV</span><span><i style="background:#0f9d8a"></i>NPV</span></div>
       </div>
     </div>
-    <div class="card">
-      <h2 class="lab-h">500 people tested</h2>
-      <div class="icons" id="icons" role="img"></div>
-      <div class="key"><span><i class="tp"></i>Sick, positive</span><span><i class="fn"></i>Sick, negative</span><span><i class="fp"></i>Healthy, positive</span><span><i class="tn"></i>Healthy, negative</span></div>
-    </div>
-    <div class="card">
-      <h2 class="lab-h">2×2 table</h2>
-      <div class="scroll"><table class="data" id="tab"></table></div>
-    </div>
-    <div class="card">
-      <h2 class="lab-h">Predictive values across prevalence</h2>
-      <svg id="curve"></svg>
-      <div class="legend"><span><i style="background:#7c5cff"></i>PPV</span><span><i style="background:#0f9d8a"></i>NPV</span></div>
+  </div>
+
+  <div class="tabs__panel" id="t-roc" role="tabpanel" hidden>
+    <div class="grid">
+      <div class="col-12 card">
+        <div class="controls" id="r-ctl">
+          <label class="ctl" for="r-thr">Cut-off <span class="val" data-for="r-thr"></span>
+            <input type="range" id="r-thr" min="0" max="40" step="0.5" value="14" data-unit=" ng/mL"></label>
+          <label class="ctl" for="r-sep">Separation between groups <span class="val" data-for="r-sep"></span>
+            <input type="range" id="r-sep" min="0" max="3" step="0.1" value="1.6"></label>
+          <div class="btns">
+            <button class="btn btn--primary" id="r-best" type="button">Best cut-off</button>
+            <button class="btn" id="r-reseed" type="button">New patients</button>
+          </div>
+        </div>
+      <div class="sep"></div>
+        <div class="metrics">
+          <div class="metric"><b id="r-auc"></b><span>AUC</span></div>
+          <div class="metric"><b id="r-se"></b><span>Sensitivity</span></div>
+          <div class="metric"><b id="r-sp"></b><span>Specificity</span></div>
+          <div class="metric alt"><b id="r-yj"></b><span>Best cut-off (Youden)</span></div>
+        </div>
+      </div>
+      <div class="col-6 card">
+        <h3>Biomarker values</h3>
+        <svg id="r-hist"></svg>
+        <div class="legend"><span><i style="background:#8a8fa0"></i>Healthy</span><span><i style="background:#d1435b"></i>Sick</span><span><i style="background:#7c5cff"></i>Cut-off</span></div>
+      </div>
+      <div class="col-6 card">
+        <h3>ROC curve</h3>
+        <svg id="r-roc"></svg>
+      </div>
     </div>
   </div>
 </div>
-<p class="note">PPV = Se·P / (Se·P + (1−Sp)(1−P)); NPV = Sp(1−P) / (Sp(1−P) + (1−Se)P); LR+ = Se/(1−Sp); LR− = (1−Se)/Sp. For learning only, not for clinical decisions.</p>
+
 <script>
 (() => {
 const $ = id => document.getElementById(id);
 const calc = (P, Se, Sp) => ({ ppv: Se * P / (Se * P + (1 - Sp) * (1 - P)), npv: Sp * (1 - P) / (Sp * (1 - P) + (1 - Se) * P) });
 function render() {
-  const P = +$('prev').value / 100, Se = +$('se').value / 100, Sp = +$('sp').value / 100, N = Math.max(1, +$('n').value || 10000);
+  const P = +$('prev').value / 100, Se = +$('se').value / 100, Sp = +$('sp').value / 100, N = 10000;
   const { ppv, npv } = calc(P, Se, Sp);
   $('ppv').textContent = Lab.pct(ppv); $('npv').textContent = Lab.pct(npv);
   $('lrp').textContent = Sp < 1 ? Lab.num(Se / (1 - Sp), 1) : '∞'; $('lrn').textContent = Lab.num((1 - Se) / Sp, 2);
-  const tp = N * P * Se, fn = N * P - tp, tn = N * (1 - P) * Sp, fp = N * (1 - P) - tn;
-  $('headline').textContent = `Of ${Lab.int(tp + fp)} positive results, ${Lab.int(tp)} are truly sick (${Lab.pct(ppv, 0)}).`;
-  $('tab').innerHTML = `<thead><tr><th></th><th>Sick</th><th>Healthy</th><th>Total</th></tr></thead><tbody>
-    <tr><td>Test positive</td><td>${Lab.int(tp)}</td><td>${Lab.int(fp)}</td><td>${Lab.int(tp + fp)}</td></tr>
-    <tr><td>Test negative</td><td>${Lab.int(fn)}</td><td>${Lab.int(tn)}</td><td>${Lab.int(fn + tn)}</td></tr>
-    <tr><td>Total</td><td>${Lab.int(N * P)}</td><td>${Lab.int(N * (1 - P))}</td><td>${Lab.int(N)}</td></tr></tbody>`;
+  const tp = N * P * Se, fp = N * (1 - P) * (1 - Sp);
+  $('headline').textContent = `Out of ${Lab.int(tp + fp)} positive results in 10,000 people, ${Lab.int(tp)} are truly sick.`;
   const M = 500, sick = Math.round(M * P), tpi = Math.round(sick * Se), fpi = Math.round((M - sick) * (1 - Sp));
   const cells = [].concat(Array(tpi).fill('tp'), Array(sick - tpi).fill('fn'), Array(fpi).fill('fp'), Array(M - sick - fpi).fill('tn'));
   $('icons').innerHTML = cells.map(c => `<i class="${c}"></i>`).join('');
@@ -114,7 +140,7 @@ function render() {
   const a = [], b = [];
   for (let p = 0.001; p <= 0.6; p += 0.004) { const r = calc(p, Se, Sp); a.push([p * 100, r.ppv * 100]); b.push([p * 100, r.npv * 100]); }
   Lab.chart($('curve'), { series: [{ points: a, color: Lab.C.accent }, { points: b, color: Lab.C.second }], xmin: 0, xmax: 60, ymin: 0, ymax: 100,
-    xlab: 'Prevalence (%)', ylab: 'Predictive value (%)', vlines: [{ x: P * 100, color: Lab.C.muted, label: 'current' }] });
+    xlab: 'Prevalence (%)', ylab: 'Predictive value (%)', height: 260, vlines: [{ x: P * 100, color: Lab.C.muted, label: 'now' }] });
 }
 document.querySelectorAll('[data-p]').forEach(b => b.addEventListener('click', () => {
   $('prev').value = b.dataset.p; $('se').value = b.dataset.se; $('sp').value = b.dataset.sp;
@@ -122,14 +148,50 @@ document.querySelectorAll('[data-p]').forEach(b => b.addEventListener('click', (
 }));
 Lab.bindRanges($('ctl'), render);
 })();
+
+(() => {
+const $ = id => document.getElementById(id);
+let seed = 7, data;
+function simulate() {
+  const r = Lab.rng(seed), n = 300, sep = +$('r-sep').value, h = [], d = [];
+  for (let i = 0; i < n; i++) h.push(Math.exp(Lab.normal(r, 2.1, 0.45)));
+  for (let i = 0; i < n; i++) d.push(Math.exp(Lab.normal(r, 2.1 + sep * 0.45, 0.45)));
+  data = { h, d };
+}
+const stats = t => ({ se: data.d.filter(v => v >= t).length / data.d.length, sp: data.h.filter(v => v < t).length / data.h.length });
+function render(resim) {
+  if (resim || !data) simulate();
+  const t = +$('r-thr').value, roc = [];
+  for (let x = 0; x <= 60; x += 0.25) { const s = stats(x); roc.push([1 - s.sp, s.se, x]); }
+  roc.sort((a, b) => a[0] - b[0] || a[1] - b[1]);
+  let auc = 0, best = roc[0];
+  for (let i = 1; i < roc.length; i++) auc += (roc[i][0] - roc[i - 1][0]) * (roc[i][1] + roc[i - 1][1]) / 2;
+  roc.forEach(p => { if (p[1] - p[0] > best[1] - best[0]) best = p; });
+  const s = stats(t);
+  $('r-auc').textContent = Lab.num(auc, 3); $('r-se').textContent = Lab.pct(s.se); $('r-sp').textContent = Lab.pct(s.sp);
+  $('r-yj').textContent = Lab.num(best[2], 1) + ' ng/mL'; $('r-best').dataset.t = best[2];
+  const bins = 40, hist = arr => { const c = new Array(bins).fill(0); arr.forEach(v => { const k = Math.floor(v); if (k < bins) c[k]++; }); return c.flatMap((v, i) => [[i, v / arr.length * 100], [i + 1, v / arr.length * 100]]); };
+  Lab.chart($('r-hist'), { series: [{ points: hist(data.h), color: Lab.C.muted, area: true, width: 1.5 }, { points: hist(data.d), color: Lab.C.bad, area: true, width: 1.5 }],
+    xmin: 0, xmax: 40, ymin: 0, xlab: 'Biomarker (ng/mL)', ylab: '% of patients', height: 260, vlines: [{ x: t, color: Lab.C.accent, label: 'positive above' }] });
+  Lab.chart($('r-roc'), { series: [{ points: [[0, 0], [1, 1]], color: Lab.C.line, dash: '5 5', width: 1.5 },
+      { points: roc.map(p => [p[0], p[1]]), color: Lab.C.accent, area: true, areaOpacity: 0.1, dots: [[1 - s.sp, s.se, 6]] }],
+    xmin: 0, xmax: 1, ymin: 0, ymax: 1, height: 260, xfmt: v => Math.round(v * 100) + '%', yfmt: v => Math.round(v * 100) + '%',
+    xlab: 'False positive rate', ylab: 'Sensitivity' });
+}
+$('r-best').addEventListener('click', () => { $('r-thr').value = $('r-best').dataset.t; $('r-thr').dispatchEvent(new Event('input')); });
+$('r-reseed').addEventListener('click', () => { seed++; render(true); });
+document.querySelectorAll('#r-ctl input').forEach(el => {
+  const out = document.querySelector(`[data-for="${el.id}"]`), upd = () => out && (out.textContent = el.value + (el.dataset.unit || ''));
+  upd(); el.addEventListener('input', () => { upd(); render(el.id !== 'r-thr'); });
+});
+render(true);
+Lab.onResize(() => render(false));
+})();
 </script>
 
-  </div>
-</section>
+<details class="method"><summary>Method and data</summary><p>PPV = Se·P / (Se·P + (1−Sp)(1−P)); NPV = Sp(1−P) / (Sp(1−P) + (1−Se)P); LR+ = Se/(1−Sp); LR− = (1−Se)/Sp. The biomarker values are simulated from two log-normal distributions. AUC by the trapezoidal rule; Youden J = sensitivity + specificity − 1. For learning only, not for clinical decisions.</p></details>
 
-<section class="section" style="padding-top:0">
-  <div class="wrap">
-    <footer>© 2026 Martina Castellucci · <a href="https://martinaa1408.github.io/">martinaa1408.github.io</a> · <a href="https://martinaa1408.github.io/privacy.html">Privacy Policy</a></footer>
+    <footer>© 2026 Martina Castellucci · <a href="https://martinaa1408.github.io/">martinaa1408.github.io</a></footer>
   </div>
 </section>
 </body>

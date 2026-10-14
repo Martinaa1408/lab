@@ -1,0 +1,145 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>Food outbreak investigation · Martina Castellucci</title>
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="description" content="A classroom case with attack rates, relative risk, incubation and symptoms. New case each time.">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="style.css">
+  <link rel="stylesheet" href="lab.css">
+  <script defer src="main.js"></script>
+  <script src="lab.js"></script>
+</head>
+<body>
+<header class="topbar">
+  <div class="wrap topbar__inner">
+    <a class="brand" href="index.html"><span class="brand__dot"></span><span>Martina Castellucci · Lab</span></a>
+    <nav class="nav">
+      <button class="nav__toggle" id="navToggle" aria-expanded="false">Menu</button>
+      <ul class="nav__menu" id="navMenu">
+        <li><a class="nav__link" href="index.html">Tools</a></li>
+        <li><a class="nav__link" href="https://github.com/Martinaa1408/lab">GitHub</a></li>
+        <li><a class="nav__link" href="https://martinaa1408.github.io/">My website</a></li>
+      </ul>
+    </nav>
+  </div>
+</header>
+
+<section class="lab-hero">
+  <div class="wrap">
+    <p class="crumb"><a href="index.html">Lab</a> · Teaching</p>
+    <h1>Food outbreak investigation</h1>
+    <p class="subtitle">After a wedding lunch many guests fell ill. Find the dish and the pathogen.</p>
+  </div>
+</section>
+
+<section class="section">
+  <div class="wrap">
+<style>
+  .feedback{ margin-top:12px; padding:12px 14px; border-radius:12px; font-size:15px; line-height:1.5; }
+  .feedback.ok{ background:rgba(47,158,102,.12); } .feedback.no{ background:rgba(209,67,91,.10); }
+  .guests td, .guests th{ text-align:center !important; } .guests td:first-child, .guests th:first-child{ text-align:left !important; }
+  .yes{ color:var(--lab-bad); font-weight:800; }
+  .ask{ display:flex; flex-wrap:wrap; gap:12px; align-items:end; margin-top:14px; }
+  .ask .ctl{ flex:1 1 260px; max-width:360px; }
+</style>
+<div class="grid">
+  <div class="col-12 card">
+    <h3>1. The guests</h3>
+    <div class="scroll" style="max-height:340px;overflow:auto"><table class="data guests" id="guests"></table></div>
+    <div class="btns" style="margin-top:14px"><button class="btn btn--primary" type="button" id="calc">Calculate attack rates</button><button class="btn" type="button" id="newcase">New case</button></div>
+  </div>
+  <div class="col-12 card" id="step2" hidden>
+    <h3>2. Attack rate by dish</h3>
+    <div class="scroll"><table class="data" id="ar"></table></div>
+    <div class="ask">
+      <label class="ctl">Which dish?<select id="dishGuess"></select></label>
+      <button class="btn btn--primary" type="button" id="checkDish">Check</button>
+    </div>
+    <div id="fb1"></div>
+  </div>
+  <div class="col-12 card" id="step3" hidden>
+    <h3>3. Incubation and symptoms</h3>
+    <div class="grid">
+      <div class="col-6"><svg id="inc"></svg><p class="small">Hours from the lunch to the first symptoms.</p></div>
+      <div class="col-6"><div class="scroll"><table class="data" id="sym"></table></div></div>
+    </div>
+    <div class="ask">
+      <label class="ctl">Which pathogen?<select id="pathGuess"></select></label>
+      <button class="btn btn--primary" type="button" id="checkPath">Check</button>
+    </div>
+    <div id="fb2"></div>
+  </div>
+</div>
+
+<script>
+(() => {
+const $ = id => document.getElementById(id);
+const DISHES = ['Seafood salad', 'Ham and melon', 'Rice salad', 'Roast chicken with gravy', 'Green salad', 'Tiramisu', 'Cream wedding cake'];
+const PATH = {
+  'Staphylococcus aureus': { dish: 'Cream wedding cake', inc: [1, 6], sym: { Vomiting: 0.85, Nausea: 0.9, 'Abdominal cramps': 0.7, Diarrhoea: 0.4, Fever: 0.05 }, why: 'short incubation (1–6 h) and vomiting without fever point to a toxin already in the food: staphylococcal enterotoxin, typical of cream desserts and handled foods kept warm.' },
+  'Bacillus cereus (emetic)': { dish: 'Rice salad', inc: [0.5, 5], sym: { Vomiting: 0.9, Nausea: 0.9, 'Abdominal cramps': 0.5, Diarrhoea: 0.2, Fever: 0.03 }, why: 'very short incubation with vomiting is typical of the emetic toxin of B. cereus, which forms in cooked rice left at room temperature.' },
+  'Clostridium perfringens': { dish: 'Roast chicken with gravy', inc: [8, 16], sym: { Diarrhoea: 0.9, 'Abdominal cramps': 0.85, Nausea: 0.3, Vomiting: 0.1, Fever: 0.05 }, why: 'incubation of 8–16 h with cramps and watery diarrhoea but little vomiting or fever is typical of C. perfringens, which grows in meat and gravy cooled too slowly.' },
+  'Salmonella': { dish: 'Tiramisu', inc: [12, 48], sym: { Diarrhoea: 0.9, Fever: 0.75, 'Abdominal cramps': 0.8, Nausea: 0.5, Vomiting: 0.35 }, why: 'incubation of 12–48 h with diarrhoea and fever points to Salmonella, often linked to raw eggs as in home-made tiramisu or mayonnaise.' },
+  'Norovirus': { dish: 'Seafood salad', inc: [12, 48], sym: { Vomiting: 0.8, Diarrhoea: 0.7, Nausea: 0.85, 'Abdominal cramps': 0.6, Fever: 0.35 }, why: 'incubation of 12–48 h with sudden vomiting and diarrhoea is typical of norovirus, often carried by raw shellfish or food handled by an infected person.' },
+};
+const SYM = ['Nausea', 'Vomiting', 'Diarrhoea', 'Abdominal cramps', 'Fever'];
+let seed = Math.floor(Date.now() / 1000) % 1000, guests, path;
+function newCase() {
+  const r = Lab.rng(seed++), names = Object.keys(PATH); path = names[Math.floor(r() * names.length)];
+  const P = PATH[path], eatP = DISHES.map(() => 0.45 + 0.4 * r());
+  guests = [];
+  for (let i = 0; i < 60; i++) {
+    const ate = DISHES.map((_, j) => r() < eatP[j]), culprit = ate[DISHES.indexOf(P.dish)];
+    const ill = r() < (culprit ? 0.72 : 0.06), g = { id: i + 1, ate, ill };
+    if (ill) { g.inc = P.inc[0] + (P.inc[1] - P.inc[0]) * Math.min(1, Math.max(0, Lab.normal(r, 0.5, 0.2))); g.sym = SYM.filter(s => r() < (culprit ? P.sym[s] : 0.4)); }
+    guests.push(g);
+  }
+  $('guests').innerHTML = `<thead><tr><th>Guest</th>${DISHES.map(d => `<th>${d}</th>`).join('')}<th>Ill</th></tr></thead><tbody>` +
+    guests.map(g => `<tr><td>${g.id}</td>${g.ate.map(a => `<td>${a ? '✓' : ''}</td>`).join('')}<td class="${g.ill ? 'yes' : ''}">${g.ill ? 'yes' : 'no'}</td></tr>`).join('') + '</tbody>';
+  $('step2').hidden = true; $('step3').hidden = true; $('fb1').innerHTML = ''; $('fb2').innerHTML = '';
+  $('dishGuess').innerHTML = '<option value="">Choose…</option>' + DISHES.map(d => `<option>${d}</option>`).join('');
+  $('pathGuess').innerHTML = '<option value="">Choose…</option>' + Object.keys(PATH).map(p => `<option>${p}</option>`).join('');
+}
+function calc() {
+  $('ar').innerHTML = '<thead><tr><th>Dish</th><th>Ate: ill/total</th><th>Attack rate</th><th>Did not eat: ill/total</th><th>Attack rate</th><th>Relative risk</th></tr></thead><tbody>' +
+    DISHES.map((d, j) => {
+      const e = guests.filter(g => g.ate[j]), n = guests.filter(g => !g.ate[j]), ei = e.filter(g => g.ill).length, ni = n.filter(g => g.ill).length;
+      const a1 = ei / e.length, a0 = ni / n.length;
+      return `<tr><td>${d}</td><td>${ei} / ${e.length}</td><td>${Lab.pct(a1, 0)}</td><td>${ni} / ${n.length}</td><td>${Lab.pct(a0, 0)}</td><td><b>${a0 ? Lab.num(a1 / a0, 1) : '∞'}</b></td></tr>`;
+    }).join('') + '</tbody>';
+  $('step2').hidden = false; $('step2').scrollIntoView({ behavior: matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth' });
+}
+function step3() {
+  const ill = guests.filter(g => g.ill), bins = new Array(25).fill(0);
+  ill.forEach(g => bins[Math.min(24, Math.floor(g.inc / 2))]++);
+  Lab.bars($('inc'), { labels: bins.map((_, i) => i % 3 === 0 ? String(i * 2) : ''), series: [{ values: bins, color: Lab.C.accent }], ylab: 'Ill guests', height: 260 });
+  $('sym').innerHTML = '<thead><tr><th>Symptom</th><th>Ill guests</th></tr></thead><tbody>' + SYM.map(s => `<tr><td>${s}</td><td>${Lab.pct(ill.filter(g => g.sym.includes(s)).length / ill.length, 0)}</td></tr>`).join('') +
+    `<tr><td>Median incubation</td><td>${Lab.num(ill.map(g => g.inc).sort((a, b) => a - b)[ill.length >> 1], 1)} h</td></tr></tbody>`;
+  $('step3').hidden = false;
+}
+$('newcase').addEventListener('click', newCase);
+$('calc').addEventListener('click', calc);
+$('checkDish').addEventListener('click', () => {
+  const v = $('dishGuess').value; if (!v) return;
+  const ok = v === PATH[path].dish;
+  $('fb1').innerHTML = `<div class="feedback ${ok ? 'ok' : 'no'}">${ok ? 'Correct. It has the highest relative risk, and few guests who skipped it fell ill.' : 'Not this one. Look for a high relative risk and few ill guests among those who did not eat it.'}</div>`;
+  if (ok) step3();
+});
+$('checkPath').addEventListener('click', () => {
+  const v = $('pathGuess').value; if (!v) return;
+  const ok = v === path;
+  $('fb2').innerHTML = `<div class="feedback ${ok ? 'ok' : 'no'}">${ok ? 'Correct: ' + PATH[path].why : 'Not quite. Compare the incubation time and the main symptoms with each pathogen.'}</div>`;
+});
+newCase();
+})();
+</script>
+
+<details class="method"><summary>Method and data</summary><p>Simulated case. Pathogen profiles follow typical textbook values for incubation and main symptoms. Attack rate = ill / total in each group; relative risk = attack rate among those who ate the dish / attack rate among those who did not. Real investigations add laboratory tests on patients and leftover food.</p></details>
+
+    <footer>© 2026 Martina Castellucci · <a href="https://martinaa1408.github.io/">martinaa1408.github.io</a></footer>
+  </div>
+</section>
+</body>
+</html>

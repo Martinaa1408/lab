@@ -36,7 +36,7 @@ const Lab = (() => {
     const bw = opt.width || dw, bh = opt.height || dh;
     svg.setAttribute('class', 'chart');
     const W = Math.round(svg.getBoundingClientRect().width) || bw;
-    return [W, Math.max(200, Math.round(W * bh / bw))];
+    return [W, Math.max(200, Math.min(Math.round(bh * 1.05), Math.round(W * bh / bw)))];
   }
   function chart(svg, opt) {
     const [W, H] = size(svg, opt, 640, 340);
@@ -158,13 +158,19 @@ const Lab = (() => {
     onChange();
     onResize(onChange);
   }
+  const redraws = [];
   function onResize(fn) {
+    redraws.push(fn);
     let t, w = window.innerWidth;
     window.addEventListener('resize', () => {
       if (window.innerWidth === w) return;
       w = window.innerWidth; clearTimeout(t); t = setTimeout(fn, 150);
     });
   }
+  // Charts inside a hidden tab are drawn at zero width: redraw everything when a tab opens.
+  document.addEventListener('click', e => {
+    if (e.target.closest && e.target.closest('.tabs__btn')) setTimeout(() => redraws.forEach(f => f()), 0);
+  });
 
   return { C, onResize, rng, normal, pct, num, int, chart, bars, css, pnorm, qnorm, pchisq1, bindRanges, niceTicks };
 })();

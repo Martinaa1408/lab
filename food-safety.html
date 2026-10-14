@@ -1,0 +1,291 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>Food safety · Martina Castellucci</title>
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="description" content="Rates with confidence intervals, enrichment tests, trend test and risk tiers, as in my thesis.">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="style.css">
+  <link rel="stylesheet" href="lab.css">
+  <script defer src="main.js"></script>
+  <script src="lab.js"></script>
+</head>
+<body>
+<header class="topbar">
+  <div class="wrap topbar__inner">
+    <a class="brand" href="index.html"><span class="brand__dot"></span><span>Martina Castellucci · Lab</span></a>
+    <nav class="nav">
+      <button class="nav__toggle" id="navToggle" aria-expanded="false">Menu</button>
+      <ul class="nav__menu" id="navMenu">
+        <li><a class="nav__link" href="index.html">Tools</a></li>
+        <li><a class="nav__link" href="https://github.com/Martinaa1408/lab">GitHub</a></li>
+        <li><a class="nav__link" href="https://martinaa1408.github.io/">My website</a></li>
+      </ul>
+    </nav>
+  </div>
+</header>
+
+<section class="lab-hero">
+  <div class="wrap">
+    <p class="crumb"><a href="index.html">Lab</a> · Food safety</p>
+    <h1>Food safety</h1>
+    <p class="subtitle">Non-compliance rates, trends and risk ranking for contaminants in food.</p>
+  </div>
+</section>
+
+<section class="section">
+  <div class="wrap">
+<style>
+  #tab th:nth-child(2), #tab td:nth-child(2){ text-align:left; }
+  #tab td:nth-child(n+3){ white-space:nowrap; }
+  #tab td small{ display:block; color:var(--muted); }
+  .ci{ position:relative; height:14px; min-width:110px; }
+  .ci span{ position:absolute; top:6px; height:2px; background:var(--accent); }
+  .ci b{ position:absolute; top:3px; width:8px; height:8px; border-radius:50%; background:var(--accent); margin-left:-4px; }
+  
+
+  .tierH{ color:var(--lab-bad); } .tierM{ color:#9a6a0c; } .tierL{ color:var(--lab-good); } .tierI{ color:var(--muted); }
+  #k-tab th:nth-child(2), #k-tab td:nth-child(2){ text-align:left; }
+</style>
+<div data-tabs>
+  <div class="tabwrap"><div class="tabs__bar pagetabs" role="tablist"><button class="tabs__btn" role="tab" aria-selected="true" aria-controls="t-rates">Non-compliance</button><button class="tabs__btn" role="tab" aria-selected="false" aria-controls="t-trend">Trend</button><button class="tabs__btn" role="tab" aria-selected="false" aria-controls="t-rank">Risk ranking</button></div></div>
+  <div class="tabs__panel" id="t-rates" role="tabpanel">
+
+    <div class="grid">
+      <div class="col-12 card">
+        <div class="controls" id="ctl">
+          <details class="full editdata"><summary>Edit the data</summary>
+            <label class="ctl" for="data">Contaminant; food; samples; non-compliant
+            <textarea id="data" spellcheck="false" style="min-height:150px"></textarea></label></details>
+          <label class="ctl">False discovery rate
+            <select id="q"><option value="0.01">1%</option><option value="0.05" selected>5%</option><option value="0.1">10%</option></select></label>
+          <div class="btns"><button class="btn" id="example" type="button">Reload example</button></div>
+        </div>
+      <div class="sep"></div>
+        <p class="headline" id="headline"></p>
+        <div class="metrics">
+          <div class="metric"><b id="m1"></b><span>Samples</span></div>
+          <div class="metric"><b id="m2"></b><span>Overall non-compliance</span></div>
+          <div class="metric alt"><b id="m3"></b><span>Significant pairs</span></div>
+        </div>
+      </div>
+      <div class="col-12 card">
+        <div class="scroll"><table class="data" id="tab"></table></div>
+        <div class="btns" style="margin-top:12px"><button class="btn" type="button" id="more"></button></div>
+      </div>
+    </div>
+  </div>
+  <div class="tabs__panel" id="t-trend" role="tabpanel" hidden>
+
+    <div class="grid">
+      <div class="col-12 card">
+        <div class="controls" id="t-ctl">
+          <label class="ctl full" for="t-data">Monthly values, oldest first
+            <textarea id="t-data" spellcheck="false" style="min-height:70px"></textarea></label>
+          <label class="ctl" for="t-trend">Simulated change per year <span class="val" data-for="t-trend"></span>
+            <input type="range" id="t-trend" min="-3" max="3" step="0.1" value="0.8" data-unit=" points"></label>
+          <label class="ctl" for="t-noise">Simulated noise <span class="val" data-for="t-noise"></span>
+            <input type="range" id="t-noise" min="0.2" max="4" step="0.1" value="1.2"></label>
+          <div class="btns"><button class="btn" type="button" id="t-sim">Simulate 36 months</button></div>
+        </div>
+      <div class="sep"></div>
+        <p class="headline" id="t-headline"></p>
+        <div class="metrics">
+          <div class="metric"><b id="t-s"></b><span>Mann-Kendall S</span></div>
+          <div class="metric"><b id="t-tau"></b><span>Kendall's tau</span></div>
+          <div class="metric"><b id="t-p"></b><span>p-value</span></div>
+          <div class="metric alt"><b id="t-sen"></b><span>Sen's slope per year</span></div>
+        </div>
+      </div>
+      <div class="col-12 card">
+        <svg id="t-plot"></svg>
+        <div class="legend"><span><i style="background:#7c5cff"></i>Monthly value</span><span><i style="background:#d1435b"></i>Sen's trend line</span></div>
+      </div>
+    </div>
+  </div>
+  <div class="tabs__panel" id="t-rank" role="tabpanel" hidden>
+    <div class="grid">
+  <div class="col-12 card">
+    <div class="controls" id="k-ctl">
+      <label class="ctl" for="k-w">Weight of past results <span class="val" data-for="k-w"></span>
+        <input type="range" id="k-w" min="0" max="1" step="0.05" value="0.45"></label>
+      <label class="ctl" for="k-minn">Minimum samples <span class="val" data-for="k-minn"></span>
+        <input type="range" id="k-minn" min="5" max="60" step="5" value="15"></label>
+      <label class="ctl" for="k-hi">High-risk cut-off <span class="val" data-for="k-hi"></span>
+        <input type="range" id="k-hi" min="50" max="99" step="1" value="85" data-unit="th pct"></label>
+      <label class="ctl" for="k-mid">Medium-risk cut-off <span class="val" data-for="k-mid"></span>
+        <input type="range" id="k-mid" min="20" max="95" step="1" value="60" data-unit="th pct"></label>
+      <div class="btns full"><button class="btn" type="button" id="k-reseed">New simulated laboratory</button></div>
+    </div>
+  <div class="sep"></div>
+    <div class="metrics">
+      <div class="metric"><b id="k-nH" class="tierH"></b><span>High risk</span></div>
+      <div class="metric"><b id="k-nM" class="tierM"></b><span>Medium risk</span></div>
+      <div class="metric"><b id="k-nL" class="tierL"></b><span>Low risk</span></div>
+      <div class="metric"><b id="k-nI" class="tierI"></b><span>Insufficient data</span></div>
+    </div>
+  </div>
+  <div class="col-6 card">
+    <h3>Past results and model</h3>
+    <svg id="k-plot"></svg>
+    <div class="legend"><span><i style="background:#d1435b"></i>High</span><span><i style="background:#c98a12"></i>Medium</span><span><i style="background:#2f9e66"></i>Low</span><span><i style="background:#c9c7d4"></i>Insufficient</span></div>
+  </div>
+  <div class="col-6 card">
+    <h3>Sampling priority</h3>
+    <div class="scroll"><table class="data" id="k-tab"></table></div>
+  </div>
+</div>
+
+  </div>
+</div>
+<script>
+const LF = (() => { const c = [0]; for (let i = 1; i <= 200000; i++) c[i] = c[i - 1] + Math.log(i); return c; })();
+const lchoose = (n, k) => LF[n] - LF[k] - LF[n - k];
+function fisherGreater(a, b, c, d) {
+  const r1 = a + b, c1 = a + c, n = a + b + c + d, lo = Math.max(0, c1 - (n - r1)), hi = Math.min(r1, c1), base = lchoose(n, c1);
+  let p = 0; for (let x = Math.max(a, lo); x <= hi; x++) p += Math.exp(lchoose(r1, x) + lchoose(n - r1, c1 - x) - base);
+  return Math.min(1, p);
+}
+function wilson(k, n, z = 1.959964) {
+  if (!n) return [NaN, NaN];
+  const p = k / n, den = 1 + z * z / n, ctr = (p + z * z / (2 * n)) / den, half = z * Math.sqrt(p * (1 - p) / n + z * z / (4 * n * n)) / den;
+  return [Math.max(0, ctr - half), Math.min(1, ctr + half)];
+}
+function bh(ps) { const m = ps.length, idx = ps.map((p, i) => [p, i]).sort((a, b) => a[0] - b[0]), q = new Array(m); let prev = 1;
+  for (let r = m; r >= 1; r--) { const [p, i] = idx[r - 1]; prev = Math.min(prev, p * m / r); q[i] = prev; } return q; }
+function mannKendall(x) {
+  const n = x.length; let S = 0;
+  for (let i = 0; i < n - 1; i++) for (let j = i + 1; j < n; j++) S += Math.sign(x[j] - x[i]);
+  const ties = {}; x.forEach(v => ties[v] = (ties[v] || 0) + 1);
+  const tieTerm = Object.values(ties).reduce((s, t) => s + t * (t - 1) * (2 * t + 5), 0);
+  const v = (n * (n - 1) * (2 * n + 5) - tieTerm) / 18;
+  const z = S > 0 ? (S - 1) / Math.sqrt(v) : S < 0 ? (S + 1) / Math.sqrt(v) : 0;
+  const slopes = [];
+  for (let i = 0; i < n - 1; i++) for (let j = i + 1; j < n; j++) slopes.push((x[j] - x[i]) / (j - i));
+  const med = a => { const s = a.slice().sort((p, q) => p - q), m = s.length >> 1; return s.length % 2 ? s[m] : (s[m - 1] + s[m]) / 2; };
+  const slope = med(slopes), intercept = med(x) - (n - 1) / 2 * slope;
+  return { S, tau: S / (n * (n - 1) / 2), z, p: 2 * (1 - Lab.pnorm(Math.abs(z))), slope, intercept };
+}
+(() => {
+const $ = id => document.getElementById(id);
+const EXAMPLE = `Aflatoxin B1;Maize flour;420;31
+Aflatoxin B1;Peanuts;380;22
+Aflatoxin B1;Rice;510;4
+Aflatoxin B1;Wheat;640;5
+Ochratoxin A;Green coffee;300;12
+Ochratoxin A;Raisins;150;9
+Ochratoxin A;Wheat;520;6
+Cadmium;Fresh fish;260;11
+Cadmium;Dried mushrooms;90;14
+Cadmium;Rice;400;5
+Cadmium;Cocoa;180;6
+Lead;Dried seaweed;60;19
+Lead;Spices;210;9
+Lead;Leafy vegetables;330;4
+Lead;Milk;400;1
+Nitrates;Spinach;240;18
+Nitrates;Lettuce;300;14
+Nitrates;Rocket;120;11`;
+function render() {
+  const rows = $('data').value.trim().split('\n').map(l => l.split(/[;\t,]/).map(x => x.trim())).filter(r => r.length >= 4 && +r[2] > 0)
+    .map(r => ({ c: r[0], m: r[1], n: Math.round(+r[2]), k: Math.min(Math.round(+r[3]), Math.round(+r[2])) }));
+  if (!rows.length) { $('tab').innerHTML = '<tbody><tr><td>No valid rows. Format: contaminant; food; samples; non-compliant.</td></tr></tbody>'; return; }
+  const byC = {}; rows.forEach(r => { byC[r.c] = byC[r.c] || { n: 0, k: 0 }; byC[r.c].n += r.n; byC[r.c].k += r.k; });
+  rows.forEach(r => { const a = r.k, b = r.n - r.k, c = byC[r.c].k - r.k, d = byC[r.c].n - r.n - c;
+    r.p = c + d > 0 ? fisherGreater(a, b, c, d) : 1; const h = [a, b, c, d].some(v => v === 0) ? 0.5 : 0;
+    r.or = (a + h) * (d + h) / ((b + h) * (c + h)); r.rate = r.k / r.n; r.ci = wilson(r.k, r.n); });
+  const q = bh(rows.map(r => r.p)); rows.forEach((r, i) => r.q = q[i]);
+  const thr = +$('q').value, N = rows.reduce((s, r) => s + r.n, 0), K = rows.reduce((s, r) => s + r.k, 0), sig = rows.filter(r => r.q < thr && r.or > 1);
+  $('m1').textContent = Lab.int(N); $('m2').textContent = Lab.pct(K / N); $('m3').textContent = `${sig.length} of ${rows.length}`;
+  rows.sort((x, y) => x.q - y.q);
+  $('headline').textContent = sig.length ? `Top pair: ${rows[0].c} in ${rows[0].m.toLowerCase()}, ${Lab.pct(rows[0].rate)} of samples non-compliant.` : 'No pair passes the threshold.';
+  const mx = Math.max(...rows.map(r => r.ci[1]));
+  $('tab').innerHTML = '<thead><tr><th>Contaminant</th><th>Food</th><th>Samples</th><th>Non-comp.</th><th>Rate (95% CI)</th><th></th><th>OR</th><th>q</th></tr></thead><tbody>' +
+    rows.map((r, i) => `<tr${i >= 8 && !showAll ? ' hidden' : ''}><td>${r.c}</td><td>${r.m}</td><td>${Lab.int(r.n)}</td><td>${Lab.int(r.k)}</td><td>${Lab.pct(r.rate)}<small>${Lab.pct(r.ci[0])}–${Lab.pct(r.ci[1])}</small></td>
+      <td><div class="ci"><span style="left:${r.ci[0] / mx * 100}%;width:${(r.ci[1] - r.ci[0]) / mx * 100}%"></span><b style="left:${r.rate / mx * 100}%"></b></div></td>
+      <td>${Lab.num(r.or, 2)}</td><td class="${r.q < thr && r.or > 1 ? 'flag' : ''}">${r.q < 0.001 ? '< 0.001' : Lab.num(r.q, 3)}</td></tr>`).join('') + '</tbody>';
+  $('more').hidden = rows.length <= 8; $('more').textContent = showAll ? 'Show top 8' : `Show all ${rows.length} pairs`;
+}
+let showAll = false;
+$('more').addEventListener('click', () => { showAll = !showAll; render(); });
+$('data').value = EXAMPLE;
+$('example').addEventListener('click', () => { $('data').value = EXAMPLE; render(); });
+$('data').addEventListener('input', render); $('q').addEventListener('input', render);
+render();
+})();
+
+(() => {
+const $ = id => document.getElementById(id);
+let seed = 2;
+function simulate() {
+  const r = Lab.rng(seed++), tr = +$('t-trend').value / 12, nz = +$('t-noise').value, out = [];
+  for (let t = 0; t < 36; t++) out.push(Math.max(0, 5 + tr * t + 1.2 * Math.sin(2 * Math.PI * t / 12) + Lab.normal(r, 0, nz)).toFixed(2));
+  $('t-data').value = out.join(', ');
+}
+function render() {
+  const x = $('t-data').value.split(/[\s,;]+/).filter(t => t !== '').map(Number).filter(v => isFinite(v));
+  if (x.length < 4) { $('t-headline').textContent = 'Enter at least 4 values.'; return; }
+  const r = mannKendall(x);
+  $('t-s').textContent = r.S; $('t-tau').textContent = Lab.num(r.tau, 3); $('t-p').textContent = r.p < 0.001 ? '< 0.001' : Lab.num(r.p, 3);
+  $('t-sen').textContent = (r.slope >= 0 ? '+' : '') + Lab.num(r.slope * 12, 2);
+  $('t-headline').textContent = r.p < 0.05 ? `${r.slope > 0 ? 'Increasing' : 'Decreasing'} trend over ${x.length} months (p ${r.p < 0.001 ? '< 0.001' : '= ' + r.p.toFixed(3)}).` : `No significant trend over ${x.length} months (p = ${r.p.toFixed(3)}).`;
+  Lab.chart($('t-plot'), { series: [{ points: x.map((v, t) => [t + 1, v]), color: Lab.C.accent, dots: x.map((v, t) => [t + 1, v, 3]) },
+      { points: [[1, r.intercept], [x.length, r.intercept + r.slope * (x.length - 1)]], color: Lab.C.bad, dash: '6 4' }],
+    xmin: 1, xmax: x.length, ymin: Math.min(0, ...x), xlab: 'Month', ylab: 'Non-compliance (%)', height: 260 });
+}
+$('t-sim').addEventListener('click', () => { simulate(); render(); });
+$('t-data').addEventListener('input', render);
+document.querySelectorAll('#t-ctl input[type=range]').forEach(el => { const out = document.querySelector(`[data-for="${el.id}"]`), upd = () => out.textContent = el.value + (el.dataset.unit || ''); upd(); el.addEventListener('input', upd); });
+simulate(); render(); Lab.onResize(render);
+})();
+</script>
+
+<script>
+(() => {
+const $ = id => document.getElementById(id);
+const CONT = ['Aflatoxin B1', 'Ochratoxin A', 'Deoxynivalenol', 'Fumonisins', 'Zearalenone', 'Lead', 'Cadmium', 'Mercury', 'Nitrates', 'PAH4', 'Tropane alkaloids', '3-MCPD'];
+const FOOD = ['Maize flour', 'Wheat', 'Rice', 'Peanuts', 'Spices', 'Dried fruit', 'Fresh fish', 'Dried seaweed', 'Spinach', 'Lettuce', 'Cocoa', 'Infant cereals', 'Vegetable oils', 'Green coffee'];
+let seed = 12, pairs;
+function simulate() {
+  const r = Lab.rng(seed); pairs = [];
+  for (let i = 0; i < 70; i++) {
+    const c = CONT[Math.floor(r() * CONT.length)], f = FOOD[Math.floor(r() * FOOD.length)];
+    if (pairs.some(p => p.c === c && p.f === f)) continue;
+    const risk = Math.exp(Lab.normal(r, -3.3, 1.1)), n = Math.round(Math.exp(Lab.normal(r, 3.4, 1))) + 3;
+    let k = 0; for (let j = 0; j < n; j++) if (r() < Math.min(0.9, risk)) k++;
+    const prob = Math.min(0.99, Math.max(0.005, 1 / (1 + Math.exp(-(Math.log(risk / (1 - Math.min(risk, 0.95))) + Lab.normal(r, 0, 0.7))))));
+    pairs.push({ c, f, n, k, rate: k / n, prob });
+  }
+}
+// Mean-rank percentile (0–100) of v among vals, ties share the average rank
+const pctRank = (vals, v) => { const n = vals.length; if (n < 2) return 50; const less = vals.filter(x => x < v).length, eq = vals.filter(x => x === v).length; return (less + (eq - 1) / 2) / (n - 1) * 100; };
+function render() {
+  const w = +$('k-w').value, minn = +$('k-minn').value, hi = +$('k-hi').value, mid = Math.min(+$('k-mid').value, hi - 1);
+  const ok = pairs.filter(p => p.n >= minn), rates = ok.map(p => p.rate), probs = ok.map(p => p.prob);
+  pairs.forEach(p => { p.score = p.n >= minn ? w * pctRank(rates, p.rate) + (1 - w) * pctRank(probs, p.prob) : NaN; });
+  const scores = ok.map(p => p.score);
+  pairs.forEach(p => { if (p.n < minn) p.tier = 'I'; else { const pr = pctRank(scores, p.score); p.tier = pr >= hi ? 'H' : pr >= mid ? 'M' : 'L'; } });
+  ['H', 'M', 'L', 'I'].forEach(t => $('k-n' + t).textContent = pairs.filter(p => p.tier === t).length);
+  const col = { H: Lab.C.bad, M: Lab.C.warn, L: Lab.C.good, I: '#c9c7d4' };
+  Lab.chart($('k-plot'), { series: [], dots: pairs.map(p => [p.prob * 100, p.rate * 100, col[p.tier], 3 + Math.min(6, Math.sqrt(p.n) / 2), 0.8, `${p.c} in ${p.f}: ${p.k}/${p.n} non-compliant, model ${Math.round(p.prob * 100)}%`]),
+    xmin: 0, xmax: Math.min(100, Math.ceil(Math.max(...pairs.map(p => p.prob)) * 10 + 0.5) * 10), ymin: 0, xlab: 'Model probability (%)', ylab: 'Past non-compliance (%)', height: 260 });
+  const order = { H: 0, M: 1, L: 2, I: 3 };
+  const top = pairs.slice().sort((a, b) => order[a.tier] - order[b.tier] || (b.score || 0) - (a.score || 0)).slice(0, 12);
+  const name = { H: 'High', M: 'Medium', L: 'Low', I: 'Insufficient' };
+  $('k-tab').innerHTML = '<thead><tr><th>Contaminant</th><th>Food</th><th>n</th><th>Past</th><th>Model</th><th>Tier</th></tr></thead><tbody>' +
+    top.map(p => `<tr><td>${p.c}</td><td>${p.f}</td><td>${p.n}</td><td>${Lab.pct(p.rate, 0)}</td><td>${Lab.pct(p.prob, 0)}</td><td class="tier${p.tier}"><b>${name[p.tier]}</b></td></tr>`).join('') + '</tbody>';
+}
+$('k-reseed').addEventListener('click', () => { seed++; simulate(); render(); });
+simulate();
+Lab.bindRanges($('k-ctl'), render);
+})();
+</script>
+
+<details class="method"><summary>Method and data</summary><p>The example data are invented, with real contaminant names. Rates come with a 95% Wilson interval. Enrichment uses a one-sided Fisher exact test that compares each pair with the other foods tested for the same contaminant, followed by Benjamini-Hochberg correction. The trend uses the Mann-Kendall test with Sen's slope. These are the inference steps of my MSc thesis pipeline; the results match SciPy, statsmodels and pymannkendall. Risk ranking: Invented data: the contaminant and food names are real categories, every number is simulated. Score = w·percentile(past non-compliance) + (1 − w)·percentile(model probability), computed among pairs with enough samples. Pairs below the minimum are marked as insufficient data. The system in my thesis also used a gradient-boosted model, statistical enrichment and pathway analysis; this page shows only the ranking step.</p></details>
+
+    <footer>© 2026 Martina Castellucci · <a href="https://martinaa1408.github.io/">martinaa1408.github.io</a></footer>
+  </div>
+</section>
+</body>
+</html>

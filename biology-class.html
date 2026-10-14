@@ -1,0 +1,290 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>Biology in class · Martina Castellucci</title>
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="description" content="Epidemic simulator, Mendelian genetics with a chi-square test, and a mutation-finding exercise.">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="style.css">
+  <link rel="stylesheet" href="lab.css">
+  <script defer src="main.js"></script>
+  <script src="lab.js"></script>
+</head>
+<body>
+<header class="topbar">
+  <div class="wrap topbar__inner">
+    <a class="brand" href="index.html"><span class="brand__dot"></span><span>Martina Castellucci · Lab</span></a>
+    <nav class="nav">
+      <button class="nav__toggle" id="navToggle" aria-expanded="false">Menu</button>
+      <ul class="nav__menu" id="navMenu">
+        <li><a class="nav__link" href="index.html">Tools</a></li>
+        <li><a class="nav__link" href="https://github.com/Martinaa1408/lab">GitHub</a></li>
+        <li><a class="nav__link" href="https://martinaa1408.github.io/">My website</a></li>
+      </ul>
+    </nav>
+  </div>
+</header>
+
+<section class="lab-hero">
+  <div class="wrap">
+    <p class="crumb"><a href="index.html">Lab</a> · Teaching</p>
+    <h1>Biology in class</h1>
+    <p class="subtitle">Three short activities for lessons and school talks: an epidemic, Mendel's peas and a mutation in the beta-globin gene.</p>
+  </div>
+</section>
+
+<section class="section">
+  <div class="wrap">
+<style>
+  .punnett{ border-collapse:collapse; margin:4px 0; }
+  .punnett td, .punnett th{ border:1px solid var(--border); padding:8px 10px; text-align:center; font-family: ui-monospace, Menlo, Consolas, monospace; font-size:15px; min-width:52px; }
+  .punnett th{ background:#f6f5fb; color:var(--accent); }
+  .punnett td.dom{ background:rgba(124,92,255,.10); }
+
+  .seqrow{ display:flex; flex-wrap:wrap; gap:6px; align-items:flex-end; }
+  .rowlab{ font-weight:800; font-size:13px; color:var(--muted); margin:16px 0 6px; }
+  .rowlab:first-child{ margin-top:0; }
+  .cod{ display:flex; flex-direction:column; align-items:center; gap:2px; }
+  .cod small{ font-size:10.5px; color:var(--muted); font-variant-numeric:tabular-nums; }
+  .cod button, .cod span.nt{ font: 600 14px ui-monospace, Menlo, Consolas, monospace; letter-spacing:1px; padding:6px 7px; border-radius:9px;
+    border:1px solid var(--border); background:#fff; color:var(--text); }
+  .cod button{ cursor:pointer; }
+  .cod button:hover{ border-color:var(--accent); }
+  .cod .aa{ font: 700 12px Inter, system-ui, sans-serif; color:var(--accent); min-height:15px; }
+  .cod.hit button, .cod.hit span.nt{ background:rgba(209,67,91,.12); border-color:var(--lab-bad); }
+  .cod.miss button{ background:rgba(17,17,17,.05); }
+  .verdict{ margin-top:14px; padding:12px 14px; border-radius:12px; font-size:15px; line-height:1.5; }
+  .verdict.ok{ background:rgba(47,158,102,.12); } .verdict.no{ background:rgba(209,67,91,.10); }
+</style>
+<div data-tabs>
+  <div class="tabwrap"><div class="tabs__bar pagetabs" role="tablist"><button class="tabs__btn" role="tab" aria-selected="true" aria-controls="t-epi">Epidemic</button><button class="tabs__btn" role="tab" aria-selected="false" aria-controls="t-gen">Genetics</button><button class="tabs__btn" role="tab" aria-selected="false" aria-controls="t-mut">Find the mutation</button></div></div>
+  <div class="tabs__panel" id="t-epi" role="tabpanel">
+<div class="grid">
+  <div class="col-12 card">
+    <div class="controls" id="ctl">
+      <label class="ctl" for="r0">R₀ <span class="val" data-for="r0"></span>
+        <input type="range" id="r0" min="1" max="15" step="0.1" value="3"></label>
+      <label class="ctl" for="vac">Vaccinated <span class="val" data-for="vac"></span>
+        <input type="range" id="vac" min="0" max="98" step="1" value="40" data-unit="%"></label>
+      <label class="ctl" for="eff">Vaccine effectiveness <span class="val" data-for="eff"></span>
+        <input type="range" id="eff" min="30" max="100" step="1" value="90" data-unit="%"></label>
+      <label class="ctl" for="cut">Fewer contacts <span class="val" data-for="cut"></span>
+        <input type="range" id="cut" min="0" max="80" step="1" value="0" data-unit="%"></label>
+      <label class="ctl" for="dur">Days contagious <span class="val" data-for="dur"></span>
+        <input type="range" id="dur" min="3" max="21" step="1" value="7"></label>
+      <div class="btns"><button class="btn" type="button" data-preset="2.5,0,90,0,5">Flu</button><button class="btn" type="button" data-preset="15,92,97,0,8">Measles</button></div>
+    </div>
+  <div class="sep"></div>
+    <p class="headline" id="headline"></p>
+    <div class="metrics">
+      <div class="metric"><b id="rt"></b><span>Effective R</span></div>
+      <div class="metric"><b id="herd"></b><span>Coverage for herd immunity</span></div>
+      <div class="metric alt"><b id="peak"></b><span>Ill at the peak</span></div>
+      <div class="metric alt"><b id="tot"></b><span>Infected in total</span></div>
+    </div>
+  </div>
+  <div class="col-12 card">
+    <svg id="sir"></svg>
+    <div class="legend"><span><i style="background:#8a8fa0"></i>Susceptible</span><span><i style="background:#d1435b"></i>Infected</span><span><i style="background:#0f9d8a"></i>Recovered</span><span><i style="background:#7c5cff"></i>Protected by vaccine</span></div>
+  </div>
+</div>
+
+  </div>
+  <div class="tabs__panel" id="t-gen" role="tabpanel" hidden>
+<div class="grid">
+  <div class="col-12 card">
+    <div class="controls" id="g-ctl">
+      <label class="ctl">Genes
+        <select id="g-ng"><option value="1">One: seed colour</option><option value="2">Two: colour and shape</option></select></label>
+      <label class="ctl">Parent 1, colour<select id="g-p1a"><option>YY</option><option selected>Yy</option><option>yy</option></select></label>
+      <label class="ctl">Parent 2, colour<select id="g-p2a"><option>YY</option><option selected>Yy</option><option>yy</option></select></label>
+      <label class="ctl gB">Parent 1, shape<select id="g-p1b"><option>RR</option><option selected>Rr</option><option>rr</option></select></label>
+      <label class="ctl gB">Parent 2, shape<select id="g-p2b"><option>RR</option><option selected>Rr</option><option>rr</option></select></label>
+      <label class="ctl" for="g-n">Offspring <span class="val" data-for="g-n"></span>
+        <input type="range" id="g-n" min="10" max="1000" step="10" value="100"></label>
+      <div class="btns"><button class="btn btn--primary" type="button" id="g-sim">Simulate offspring</button></div>
+    </div>
+  </div>
+  <div class="col-6 card">
+    <h3>Punnett square</h3>
+    <div class="scroll" id="g-sq"></div>
+  </div>
+  <div class="col-6 card">
+    <p class="headline" id="g-headline"></p>
+    <div class="scroll"><table class="data" id="g-tab"></table></div>
+    <div class="metrics" style="margin-top:14px">
+      <div class="metric"><b id="g-chi"></b><span>Chi-square</span></div>
+      <div class="metric"><b id="g-df"></b><span>Degrees of freedom</span></div>
+      <div class="metric alt"><b id="g-p"></b><span>p-value</span></div>
+    </div>
+  </div>
+</div>
+
+  </div>
+  <div class="tabs__panel" id="t-mut" role="tabpanel" hidden>
+<div class="grid">
+  <div class="col-12 card">
+    <div class="btns" id="m-cases" style="margin-bottom:16px"></div>
+    <div class="rowlab">Reference</div>
+    <div class="seqrow" id="m-ref"></div>
+    <div class="rowlab">Patient: click the codon that differs</div>
+    <div class="seqrow" id="m-pat"></div>
+    <div class="btns" style="margin-top:16px">
+      <button class="btn" type="button" id="m-aa">Show amino acids</button>
+      <button class="btn" type="button" id="m-reveal">Show the answer</button>
+    </div>
+    <div id="m-out"></div>
+  </div>
+  <div class="col-12 card" id="m-result" hidden>
+    <div class="metrics">
+      <div class="metric"><b id="m-r-pos"></b><span>Codon</span></div>
+      <div class="metric"><b id="m-r-dna"></b><span>DNA change</span></div>
+      <div class="metric"><b id="m-r-prot"></b><span>Protein change</span></div>
+      <div class="metric alt"><b id="m-r-type"></b><span>Type</span></div>
+    </div>
+    <p id="m-r-text" style="margin:14px 0 0"></p>
+  </div>
+</div>
+
+  </div>
+</div>
+<script>
+(() => {
+const $ = id => document.getElementById(id);
+function render() {
+  const N = 10000, R0 = +$('r0').value, vac = +$('vac').value / 100, eff = +$('eff').value / 100, cut = +$('cut').value / 100, g = 1 / +$('dur').value, beta = R0 * (1 - cut) * g;
+  const V = N * vac * eff; let S = N - V - 10, I = 10, R = 0, peak = I, peakDay = 0;
+  const ps = [], pi = [], pr = [], pv = [];
+  for (let k = 0; k <= 2400; k++) {
+    const t = k * 0.1; if (k % 10 === 0) { ps.push([t, S]); pi.push([t, I]); pr.push([t, R]); pv.push([t, V]); }
+    const inf = beta * S * I / N * 0.1, rec = g * I * 0.1; S -= inf; I += inf - rec; R += rec;
+    if (I > peak) { peak = I; peakDay = t; }
+  }
+  const Rt = R0 * (1 - cut) * (N - V) / N, herd = (1 - 1 / (R0 * (1 - cut))) / eff;
+  $('rt').textContent = Lab.num(Rt, 2); $('herd').textContent = herd <= 0 ? 'not needed' : herd > 1 ? 'out of reach' : Lab.pct(herd, 0);
+  $('peak').textContent = Lab.int(peak); $('tot').textContent = Lab.int(R + I);
+  $('headline').textContent = Rt < 1 ? 'Effective R is below 1: the outbreak dies out on its own.' : `The epidemic grows and peaks after about ${Math.round(peakDay)} days.`;
+  Lab.chart($('sir'), { series: [{ points: pv, color: Lab.C.accent, dash: '6 4', width: 2 }, { points: ps, color: Lab.C.muted }, { points: pr, color: Lab.C.second }, { points: pi, color: Lab.C.bad, area: true }],
+    xmin: 0, xmax: 240, ymin: 0, ymax: N, xlab: 'Days', ylab: 'People', height: 260, yfmt: v => Lab.int(v) });
+}
+document.querySelectorAll('[data-preset]').forEach(b => b.addEventListener('click', () => {
+  const v = b.dataset.preset.split(','); ['r0', 'vac', 'eff', 'cut', 'dur'].forEach((id, i) => { $(id).value = v[i]; $(id).dispatchEvent(new Event('input')); });
+}));
+Lab.bindRanges($('ctl'), render);
+})();
+</script>
+
+<script>
+function chiSqSf(x, k) { // survival function of chi-square with k df (series for the regularised gamma)
+  if (x <= 0) return 1; const a = k / 2, z = x / 2;
+  const lg = v => { const c = [76.18009172947146, -86.50532032941677, 24.01409824083091, -1.231739572450155, 0.1208650973866179e-2, -0.5395239384953e-5]; let y = v, t = v + 5.5; t -= (v + 0.5) * Math.log(t); let s = 1.000000000190015; for (const q of c) s += q / ++y; return -t + Math.log(2.5066282746310005 * s / v); };
+  if (z < a + 1) { let sum = 1 / a, term = sum; for (let n = 1; n < 500; n++) { term *= z / (a + n); sum += term; if (term < sum * 1e-14) break; } return 1 - sum * Math.exp(-z + a * Math.log(z) - lg(a)); }
+  let b = z + 1 - a, c = 1e300, d = 1 / b, h = d; for (let i = 1; i < 500; i++) { const an = -i * (i - a); b += 2; d = an * d + b; d = 1 / d; c = b + an / c; const del = d * c; h *= del; if (Math.abs(del - 1) < 1e-14) break; }
+  return Math.exp(-z + a * Math.log(z) - lg(a)) * h;
+}
+(() => {
+const $ = id => document.getElementById(id);
+let seed = 1, counts = null;
+const gam = g => [g[0], g[1]];
+function offspring() {
+  const two = $('g-ng').value === '2';
+  const g1 = two ? gam($('g-p1a').value).flatMap(a => gam($('g-p1b').value).map(b => a + b)) : gam($('g-p1a').value);
+  const g2 = two ? gam($('g-p2a').value).flatMap(a => gam($('g-p2b').value).map(b => a + b)) : gam($('g-p2a').value);
+  const sortPair = (x, y) => [x, y].sort((p, q) => (p === p.toUpperCase() ? 0 : 1) - (q === q.toUpperCase() ? 0 : 1) || p.localeCompare(q)).join('');
+  const geno = (x, y) => two ? sortPair(x[0], y[0]) + sortPair(x[1], y[1]) : sortPair(x, y);
+  const pheno = g => { const a = /Y/.test(g) ? 'Yellow' : 'Green'; return two ? a + ', ' + (/R/.test(g) ? 'round' : 'wrinkled') : a; };
+  return { g1, g2, geno, pheno };
+}
+function render() {
+  document.querySelectorAll('.gB').forEach(e => e.hidden = $('g-ng').value !== '2');
+  const { g1, g2, geno, pheno } = offspring();
+  $('g-sq').innerHTML = `<table class="punnett"><tr><th></th>${g2.map(g => `<th>${g}</th>`).join('')}</tr>` +
+    g1.map(a => `<tr><th>${a}</th>${g2.map(b => { const g = geno(a, b); return `<td class="${/Y/.test(g) ? 'dom' : ''}">${g}</td>`; }).join('')}</tr>`).join('') + '</table>';
+  const exp = {}; g1.forEach(a => g2.forEach(b => { const p = pheno(geno(a, b)); exp[p] = (exp[p] || 0) + 1 / (g1.length * g2.length); }));
+  const classes = Object.keys(exp).sort((a, b) => exp[b] - exp[a]), n = +$('g-n').value;
+  const den = Math.min(...classes.map(c => exp[c])), ratio = classes.map(c => Math.round(exp[c] / den)).join(' : ');
+  let chi = 0, rows = '';
+  classes.forEach(c => { const e = exp[c] * n, o = counts ? counts[c] || 0 : null; if (o !== null) chi += (o - e) ** 2 / e;
+    rows += `<tr><td>${c}</td><td>${Lab.pct(exp[c], 1)}</td><td>${Lab.num(e, 1)}</td><td>${o ?? '–'}</td></tr>`; });
+  $('g-tab').innerHTML = '<thead><tr><th>Phenotype</th><th>Expected</th><th>Count</th><th>Observed</th></tr></thead><tbody>' + rows + '</tbody>';
+  const df = classes.length - 1;
+  $('g-df').textContent = df;
+  if (counts && df > 0) { const p = chiSqSf(chi, df); $('g-chi').textContent = Lab.num(chi, 2); $('g-p').textContent = Lab.num(p, 3);
+    $('g-headline').textContent = `Ratio ${ratio}. ${p >= 0.05 ? 'The counts fit the ratio.' : 'The counts deviate from the ratio (p < 0.05). By chance this happens 1 time in 20.'}`; }
+  else { $('g-chi').textContent = '–'; $('g-p').textContent = '–'; $('g-headline').textContent = `Ratio ${ratio}. ${df === 0 ? 'All offspring look the same.' : 'Simulate offspring to test the fit.'}`; }
+}
+function simulate() {
+  const r = Lab.rng(seed++), { g1, g2, geno, pheno } = offspring(); counts = {};
+  for (let i = 0; i < +$('g-n').value; i++) { const p = pheno(geno(g1[Math.floor(r() * g1.length)], g2[Math.floor(r() * g2.length)])); counts[p] = (counts[p] || 0) + 1; }
+  render();
+}
+$('g-sim').addEventListener('click', simulate);
+document.querySelectorAll('#g-ctl select, #g-ctl input').forEach(el => el.addEventListener('input', () => { counts = null; }));
+Lab.bindRanges($('g-ctl'), render);
+simulate();
+})();
+</script>
+
+<script>
+(() => {
+const $ = id => document.getElementById(id);
+const REF = 'ATGGTGCATCTGACTCCTGAGGAGAAGTCTGCCGTTACTGCCCTGTGGGGCAAGGTGAACGTGGATGAAGTTGGTGGTGAGGCCCTGGGCAGG';
+const CODE = (() => { const b = 'TCAG', aa = 'FFLLSSSSYY**CC*WLLLLPPPPHHQQRRRRIIIMTTTTNNKKSSRRVVVVAAAADDEEGGGG', t = {}; let i = 0;
+  for (const x of b) for (const y of b) for (const z of b) t[x + y + z] = aa[i++]; return t; })();
+const THREE = { A: 'Ala', R: 'Arg', N: 'Asn', D: 'Asp', C: 'Cys', Q: 'Gln', E: 'Glu', G: 'Gly', H: 'His', I: 'Ile', L: 'Leu', K: 'Lys', M: 'Met', F: 'Phe', P: 'Pro', S: 'Ser', T: 'Thr', W: 'Trp', Y: 'Tyr', V: 'Val', '*': 'Stop' };
+const CASES = [
+  { label: 'Patient A', codon: 6, to: 'GTG', text: 'Haemoglobin S. With little oxygen the protein sticks together and red cells become sickle-shaped: sickle cell disease.' },
+  { label: 'Patient B', codon: 17, to: 'TAG', text: 'A stop codon in the middle of the gene. No working beta-globin is made: beta-thalassaemia.' },
+  { label: 'Patient C', codon: 3, to: 'CTC', text: 'The codon changes but still codes for leucine. The protein is the same.' },
+  { label: 'Patient D', codon: 6, to: 'AAG', text: 'Haemoglobin C. A milder disorder than haemoglobin S, with a different amino acid at the same position.' },
+];
+const codons = s => s.match(/.{3}/g);
+let cur = 0, showAA = false, solved = false;
+function patientSeq(c) { const k = c.codon * 3; return REF.slice(0, k) + c.to + REF.slice(k + 3); }
+function row(el, seq, clickable, hit) {
+  el.innerHTML = codons(seq).map((cd, i) => `<div class="cod${hit === i ? ' hit' : ''}" data-i="${i}"><small>${i === 0 ? 'start' : i}</small>` +
+    (clickable ? `<button type="button" aria-label="Codon ${i}">${cd}</button>` : `<span class="nt">${cd}</span>`) +
+    `<span class="aa">${showAA ? (CODE[cd] === '*' ? 'Stop' : THREE[CODE[cd]]) : ''}</span></div>`).join('');
+}
+function draw() {
+  const c = CASES[cur], hit = solved ? c.codon : -1;
+  row($('m-ref'), REF, false, hit);
+  row($('m-pat'), patientSeq(c), true, hit);
+  $('m-aa').textContent = showAA ? 'Hide amino acids' : 'Show amino acids';
+  $('m-cases').innerHTML = CASES.map((x, i) => `<button class="btn${i === cur ? ' btn--primary' : ''}" type="button" data-c="${i}">${x.label}</button>`).join('');
+}
+function solve() {
+  const c = CASES[cur], from = REF.slice(c.codon * 3, c.codon * 3 + 3), a = CODE[from], b = CODE[c.to];
+  let pos = 0; while (from[pos] === c.to[pos]) pos++;
+  solved = true; draw();
+  $('m-result').hidden = false;
+  $('m-r-pos').textContent = c.codon;
+  $('m-r-dna').textContent = `${from} → ${c.to}`;
+  $('m-r-prot').textContent = a === b ? `${THREE[a]}${c.codon}${THREE[b]}` : `${THREE[a]}${c.codon}${b === '*' ? 'Ter' : THREE[b]}`;
+  $('m-r-type').textContent = b === '*' ? 'Nonsense' : a === b ? 'Silent' : 'Missense';
+  $('m-r-text').textContent = c.text;
+}
+$('m-pat').addEventListener('click', e => {
+  const d = e.target.closest('.cod'); if (!d || solved) return;
+  const i = +d.dataset.i, c = CASES[cur];
+  if (i === c.codon) { $('m-out').innerHTML = '<div class="verdict ok">Found it.</div>'; solve(); }
+  else { d.classList.add('miss'); $('m-out').innerHTML = `<div class="verdict no">Codon ${i === 0 ? 'start' : i} is the same as the reference. Compare letter by letter.</div>`; }
+});
+$('m-cases').addEventListener('click', e => {
+  const b = e.target.closest('[data-c]'); if (!b) return;
+  cur = +b.dataset.c; solved = false; $('m-result').hidden = true; $('m-out').innerHTML = ''; draw();
+});
+$('m-aa').addEventListener('click', () => { showAA = !showAA; draw(); });
+$('m-reveal').addEventListener('click', () => { $('m-out').innerHTML = ''; solve(); });
+draw();
+})();
+</script>
+
+<details class="method"><summary>Method and data</summary><p>Epidemic: Deterministic SIR model (Kermack-McKendrick) integrated with a 0.1-day step. Herd immunity threshold = (1 − 1/R) / vaccine effectiveness. The model leaves out age groups, seasons and waning immunity. Genetics: Seed colour: Y yellow (dominant), y green. Seed shape: R round (dominant), r wrinkled. With two genes, independent assortment is assumed. Chi-square goodness of fit on the phenotype classes, with k − 1 degrees of freedom. Mutation: The reference is the start of the human HBB coding sequence (beta-globin, NCBI NM_000518), 31 codons. Codons are numbered as in the medical literature, with the start codon as 0. Haemoglobin S (Glu6Val), haemoglobin C (Glu6Lys) and the codon 17 nonsense mutation (Lys17Ter, a cause of beta-thalassaemia) are real variants. The silent change at codon 3 is an example made up for the exercise.</p></details>
+
+    <footer>© 2026 Martina Castellucci · <a href="https://martinaa1408.github.io/">martinaa1408.github.io</a></footer>
+  </div>
+</section>
+</body>
+</html>

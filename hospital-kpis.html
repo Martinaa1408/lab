@@ -1,0 +1,152 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>Hospital KPIs · Martina Castellucci</title>
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="description" content="Admissions, length of stay, bed occupancy and readmissions, from filter to SQL query.">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="style.css">
+  <link rel="stylesheet" href="lab.css">
+  <script defer src="main.js"></script>
+  <script src="lab.js"></script>
+</head>
+<body>
+<header class="topbar">
+  <div class="wrap topbar__inner">
+    <a class="brand" href="index.html"><span class="brand__dot"></span><span>Martina Castellucci · Lab</span></a>
+    <nav class="nav">
+      <button class="nav__toggle" id="navToggle" aria-expanded="false">Menu</button>
+      <ul class="nav__menu" id="navMenu">
+        <li><a class="nav__link" href="index.html">Tools</a></li>
+        <li><a class="nav__link" href="https://github.com/Martinaa1408/lab">GitHub</a></li>
+        <li><a class="nav__link" href="https://martinaa1408.github.io/">My website</a></li>
+      </ul>
+    </nav>
+  </div>
+</header>
+
+<section class="lab-hero">
+  <div class="wrap">
+    <p class="crumb"><a href="index.html">Lab</a> · Healthcare data</p>
+    <h1>Hospital KPIs</h1>
+    <p class="subtitle">A year of admissions in a simulated hospital, with the SQL behind each indicator.</p>
+  </div>
+</section>
+
+<section class="section">
+  <div class="wrap">
+<style></style>
+<div class="grid">
+  <div class="col-12 card">
+    <div class="controls" id="ctl">
+      <label class="ctl">Ward<select id="ward"></select></label>
+      <label class="ctl">Setting<select id="setting"><option value="">All</option><option>Inpatient</option><option>Day hospital</option></select></label>
+      <label class="ctl">Age<select id="age"><option value="">All</option><option value="0-64">Under 65</option><option value="65-79">65 to 79</option><option value="80-120">80 and over</option></select></label>
+      <div class="btns"><button class="btn" id="csv" type="button">Download CSV</button></div>
+    </div>
+  <div class="sep"></div>
+    <div class="metrics">
+      <div class="metric"><b id="k1"></b><span>Admissions</span></div>
+      <div class="metric"><b id="k2"></b><span>Mean stay (days)</span></div>
+      <div class="metric"><b id="k3"></b><span>Bed occupancy</span></div>
+      <div class="metric alt"><b id="k4"></b><span>30-day readmissions</span></div>
+    </div>
+  </div>
+  <div class="col-6 card"><h3>Admissions by month</h3><svg id="trend"></svg></div>
+  <div class="col-6 card"><h3>Mean stay by ward</h3><svg id="byward"></svg></div>
+  <div class="col-12 card" data-tabs>
+    <div class="tabs__bar" role="tablist"><button class="tabs__btn" role="tab" aria-selected="true" aria-controls="w-tab">By ward</button><button class="tabs__btn" role="tab" aria-selected="false" aria-controls="w-sql">SQL</button></div>
+    <div class="tabs__panel" id="w-tab" role="tabpanel">
+    <div class="scroll"><table class="data" id="tab"></table></div>
+    <p class="small">Red: occupancy above 90% or readmissions above 10%.</p>
+    </div>
+    <div class="tabs__panel" id="w-sql" role="tabpanel" hidden>
+      <label class="ctl" style="max-width:260px;margin-bottom:12px">Indicator<select id="kpi"><option value="adm">Admissions</option><option value="los">Mean stay</option><option value="occ">Occupancy</option><option value="read">Readmissions</option></select></label>
+      <pre class="code" id="sql"></pre>
+    </div>
+  </div>
+</div>
+
+<script>
+(() => {
+const $ = id => document.getElementById(id);
+const WARDS = [
+  { name: 'Internal medicine', short: 'Med', beds: 50, vol: 220, los: 8.5, age: 76, read: 0.11, dh: 0.05 },
+  { name: 'Cardiology', short: 'Card', beds: 30, vol: 150, los: 5.2, age: 70, read: 0.08, dh: 0.15 },
+  { name: 'General surgery', short: 'Surg', beds: 40, vol: 200, los: 4.6, age: 61, read: 0.06, dh: 0.30 },
+  { name: 'Orthopaedics', short: 'Orth', beds: 35, vol: 160, los: 5.8, age: 66, read: 0.04, dh: 0.25 },
+  { name: 'Pulmonology', short: 'Pulm', beds: 25, vol: 95, los: 9.6, age: 73, read: 0.12, dh: 0.08 },
+];
+const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+const SEASON = [1.18, 1.12, 1.02, 0.97, 0.95, 0.9, 0.85, 0.72, 0.95, 1.0, 1.08, 1.15];
+const ROWS = (() => {
+  const r = Lab.rng(2026), rows = []; let id = 1;
+  WARDS.forEach(w => { for (let m = 0; m < 12; m++) {
+    const n = Math.round(w.vol * SEASON[m] * (0.92 + 0.16 * r()));
+    for (let i = 0; i < n; i++) {
+      const dh = r() < w.dh, age = Math.max(18, Math.min(101, Math.round(Lab.normal(r, w.age, 12))));
+      const los = dh ? 0 : Math.max(1, Math.round(-Math.log(1 - r()) * w.los * (0.8 + (age - w.age) / 120) * (m < 2 || m > 10 ? 1.08 : 1)));
+      rows.push({ id: id++, ward: w.name, month: m, setting: dh ? 'Day hospital' : 'Inpatient', age, los, readm: !dh && r() < w.read * (age >= 80 ? 1.4 : 0.9) ? 1 : 0 });
+    }
+  } });
+  return rows;
+})();
+$('ward').innerHTML = '<option value="">All</option>' + WARDS.map(w => `<option>${w.name}</option>`).join('');
+const range = () => $('age').value ? $('age').value.split('-').map(Number) : null;
+function filt() {
+  const w = $('ward').value, s = $('setting').value, a = range() || [0, 200];
+  return ROWS.filter(x => (!w || x.ward === w) && (!s || x.setting === s) && x.age >= a[0] && x.age <= a[1]);
+}
+function kpi(rows, beds) {
+  const inp = rows.filter(r => r.setting === 'Inpatient'), days = inp.reduce((s, r) => s + r.los, 0);
+  return { n: rows.length, los: inp.length ? days / inp.length : NaN, occ: days / (beds * 365), read: inp.length ? inp.reduce((s, r) => s + r.readm, 0) / inp.length : NaN };
+}
+const K = w => `<span class="kw">${w}</span>`;
+function sql() {
+  const w = $('ward').value, s = $('setting').value, a = range();
+  const where = (extra) => {
+    const c = ["f.admission_date >= DATE '2025-01-01'", "f.admission_date <  DATE '2026-01-01'"];
+    if (w) c.push(`w.ward_name = '${w}'`);
+    if (extra) c.push(extra); else if (s) c.push(`f.setting = '${s}'`);
+    if (a) c.push(`f.patient_age ${K('BETWEEN')} ${a[0]} ${K('AND')} ${Math.min(a[1], 120)}`);
+    return `${K('WHERE')} ` + c.join(`\n  ${K('AND')} `);
+  };
+  const from = `${K('FROM')} fact_admission f\n${K('JOIN')} dim_ward w ${K('ON')} w.ward_id = f.ward_id`;
+  const Q = {};
+  Q.adm = `${K('SELECT')} ${K('COUNT')}(*) ${K('AS')} admissions\n${from}\n${where()};`;
+  Q.los = `${K('SELECT')} ${K('AVG')}(f.discharge_date - f.admission_date) ${K('AS')} mean_stay_days\n${from}\n${where("f.setting = 'Inpatient'")};`;
+  Q.occ = `${K('SELECT')} ${K('SUM')}(f.discharge_date - f.admission_date) * 1.0\n       / (${K('SELECT')} ${K('SUM')}(beds) * 365 ${K('FROM')} dim_ward${w ? ` ${K('WHERE')} ward_name = '${w}'` : ''}) ${K('AS')} bed_occupancy\n${from}\n${where("f.setting = 'Inpatient'")};`;
+  Q.read = `${K('SELECT')} ${K('AVG')}(${K('CASE WHEN')} f.readmitted_30d ${K('THEN')} 1.0 ${K('ELSE')} 0 ${K('END')}) ${K('AS')} readmission_rate\n${from}\n${where("f.setting = 'Inpatient'")};`;
+  $('sql').innerHTML = Q[$('kpi').value];
+}
+function render() {
+  const rows = filt(), w = $('ward').value, beds = w ? WARDS.find(x => x.name === w).beds : WARDS.reduce((s, x) => s + x.beds, 0), k = kpi(rows, beds);
+  $('k1').textContent = Lab.int(k.n); $('k2').textContent = Lab.num(k.los, 1); $('k3').textContent = Lab.pct(k.occ, 0); $('k4').textContent = Lab.pct(k.read, 1);
+  const bm = MONTHS.map((_, m) => rows.filter(r => r.month === m).length);
+  Lab.chart($('trend'), { series: [{ points: bm.map((v, m) => [m, v]), color: Lab.C.accent, area: true, dots: bm.map((v, m) => [m, v, 3.5]) }], xmin: 0, xmax: 11, ymin: 0, xticksAt: [0, 2, 4, 6, 8, 10], xfmt: v => MONTHS[v], height: 260, ylab: 'Admissions' });
+  Lab.bars($('byward'), { labels: WARDS.map(x => x.name.split(' ')[0]), short: WARDS.map(x => x.short), series: [{ values: WARDS.map(x => kpi(rows.filter(r => r.ward === x.name), 1).los || 0), color: Lab.C.second }], height: 260, ylab: 'Days', yfmt: v => Lab.num(v, 1) });
+  $('tab').innerHTML = '<thead><tr><th>Ward</th><th>Beds</th><th>Admissions</th><th>Mean stay</th><th>Occupancy</th><th>Readmissions</th></tr></thead><tbody>' + WARDS.map(x => {
+    const kk = kpi(rows.filter(r => r.ward === x.name), x.beds);
+    return `<tr><td>${x.name}</td><td>${x.beds}</td><td>${Lab.int(kk.n)}</td><td>${Lab.num(kk.los, 1)}</td><td class="${kk.occ > 0.9 ? 'flag' : ''}">${Lab.pct(kk.occ, 0)}</td><td class="${kk.read > 0.10 ? 'flag' : ''}">${Lab.pct(kk.read, 1)}</td></tr>`;
+  }).join('') + '</tbody>';
+  sql();
+}
+$('csv').addEventListener('click', () => {
+  const body = filt().map(r => [r.id, r.ward, MONTHS[r.month], r.setting, r.age, r.los, r.readm].join(',')).join('\n');
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(new Blob(['id,ward,month,setting,age,length_of_stay,readmission_30d\n' + body], { type: 'text/csv' }));
+  a.download = 'synthetic_admissions.csv'; a.click();
+});
+document.querySelectorAll('#ctl select, #kpi').forEach(s => s.addEventListener('input', render));
+render(); Lab.onResize(render);
+})();
+</script>
+
+<details class="method"><summary>Method and data</summary><p>The data are generated by a reproducible random model; no real patient, hospital or client is involved. Occupancy = inpatient days / (beds × 365). Readmission = a new inpatient stay within 30 days of discharge. The SQL refers to a simple star schema with one fact table (fact_admission) and one ward dimension (dim_ward).</p></details>
+
+    <footer>© 2026 Martina Castellucci · <a href="https://martinaa1408.github.io/">martinaa1408.github.io</a></footer>
+  </div>
+</section>
+</body>
+</html>
