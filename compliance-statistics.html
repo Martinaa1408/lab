@@ -1,0 +1,145 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>Non-compliance statistics • Martina Castellucci Lab</title>
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="description" content="Non-compliance rates with Wilson intervals and Fisher enrichment tests with FDR, for any contaminant-food table.">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="style.css">
+  <link rel="stylesheet" href="lab.css">
+  <script defer src="main.js"></script>
+  <script src="lab.js"></script>
+</head>
+<body>
+<header class="topbar">
+  <div class="wrap topbar__inner">
+    <a class="brand" href="index.html"><span class="brand__dot"></span><span>Martina Castellucci · Lab</span></a>
+    <nav class="nav">
+      <button class="nav__toggle" id="navToggle" aria-expanded="false">Menu</button>
+      <ul class="nav__menu" id="navMenu">
+        <li><a class="nav__link" href="index.html#bio">Bioinformatics</a></li>
+        <li><a class="nav__link" href="index.html#clinical">Clinical statistics</a></li>
+        <li><a class="nav__link" href="index.html#ai">AI</a></li>
+        <li><a class="nav__link" href="index.html#food">Food safety</a></li>
+        <li><a class="nav__link" href="index.html#school">Teaching</a></li>
+        <li><a class="nav__link" href="https://martinaa1408.github.io/">My website ↗</a></li>
+      </ul>
+    </nav>
+  </div>
+</header>
+
+<section class="lab-hero">
+  <div class="wrap">
+    <p class="crumb"><a href="index.html">Lab</a> / <a href="index.html#food">Food safety</a></p>
+    <h1>Which foods fail their limits most often?</h1>
+    <p class="subtitle">A food control laboratory runs thousands of analyses. For each contaminant and food pair this tool computes the non-compliance rate with its confidence interval and tests whether it is higher than usual for that contaminant.</p>
+  </div>
+</section>
+
+<section class="section">
+  <div class="wrap">
+<style>
+  #tab th:nth-child(2), #tab td:nth-child(2){ text-align:left; }
+  #tab td:nth-child(n+3){ white-space:nowrap; }
+  #tab td small{ display:block; color:var(--muted); }
+  .ci{ position:relative; height:14px; min-width:110px; }
+  .ci span{ position:absolute; top:6px; height:2px; background:var(--accent); }
+  .ci b{ position:absolute; top:3px; width:8px; height:8px; border-radius:50%; background:var(--accent); margin-left:-4px; }
+</style>
+<div class="tool">
+  <div class="card" id="ctl">
+    <label class="ctl" for="data">Data: contaminant; food; samples; non-compliant
+      <small>Semicolon, comma or tab separated, one pair per line</small>
+      <textarea id="data" spellcheck="false" style="min-height:260px"></textarea></label>
+    <label class="ctl">False discovery rate
+      <select id="q"><option value="0.01">1%</option><option value="0.05" selected>5%</option><option value="0.1">10%</option></select></label>
+    <button class="btn" id="example" type="button">Reload the example</button>
+  </div>
+  <div class="stack">
+    <div class="card">
+      <p class="headline" id="headline"></p>
+      <div class="metrics">
+        <div class="metric"><b id="m1"></b><span>Samples analysed</span></div>
+        <div class="metric"><b id="m2"></b><span>Overall non-compliance</span></div>
+        <div class="metric alt"><b id="m3"></b><span>Pairs significant after FDR</span></div>
+      </div>
+    </div>
+    <div class="card">
+      <h2 class="lab-h">Results by pair</h2>
+      <div class="scroll"><table class="data" id="tab"></table></div>
+    </div>
+  </div>
+</div>
+<p class="note">Example data are invented, with real contaminant names. 95% Wilson interval. One-sided Fisher exact test for enrichment, comparing the pair with all other foods tested for the same contaminant; Benjamini-Hochberg adjustment; odds ratio with Haldane correction when a cell is zero. This is the inference step of the pipeline in my MSc thesis; results match SciPy and statsmodels.</p>
+<script>
+const LF = (() => { const c = [0]; for (let i = 1; i <= 200000; i++) c[i] = c[i - 1] + Math.log(i); return c; })();
+const lchoose = (n, k) => LF[n] - LF[k] - LF[n - k];
+function fisherGreater(a, b, c, d) {
+  const r1 = a + b, c1 = a + c, n = a + b + c + d, lo = Math.max(0, c1 - (n - r1)), hi = Math.min(r1, c1), base = lchoose(n, c1);
+  let p = 0; for (let x = Math.max(a, lo); x <= hi; x++) p += Math.exp(lchoose(r1, x) + lchoose(n - r1, c1 - x) - base);
+  return Math.min(1, p);
+}
+function wilson(k, n, z = 1.959964) {
+  if (!n) return [NaN, NaN];
+  const p = k / n, den = 1 + z * z / n, ctr = (p + z * z / (2 * n)) / den, half = z * Math.sqrt(p * (1 - p) / n + z * z / (4 * n * n)) / den;
+  return [Math.max(0, ctr - half), Math.min(1, ctr + half)];
+}
+function bh(ps) { const m = ps.length, idx = ps.map((p, i) => [p, i]).sort((a, b) => a[0] - b[0]), q = new Array(m); let prev = 1;
+  for (let r = m; r >= 1; r--) { const [p, i] = idx[r - 1]; prev = Math.min(prev, p * m / r); q[i] = prev; } return q; }
+(() => {
+const $ = id => document.getElementById(id);
+const EXAMPLE = `Aflatoxin B1;Maize flour;420;31
+Aflatoxin B1;Peanuts;380;22
+Aflatoxin B1;Rice;510;4
+Aflatoxin B1;Wheat;640;5
+Ochratoxin A;Green coffee;300;12
+Ochratoxin A;Raisins;150;9
+Ochratoxin A;Wheat;520;6
+Cadmium;Fresh fish;260;11
+Cadmium;Dried mushrooms;90;14
+Cadmium;Rice;400;5
+Cadmium;Cocoa;180;6
+Lead;Dried seaweed;60;19
+Lead;Spices;210;9
+Lead;Leafy vegetables;330;4
+Lead;Milk;400;1
+Nitrates;Spinach;240;18
+Nitrates;Lettuce;300;14
+Nitrates;Rocket;120;11`;
+function render() {
+  const rows = $('data').value.trim().split('\n').map(l => l.split(/[;\t,]/).map(x => x.trim())).filter(r => r.length >= 4 && +r[2] > 0)
+    .map(r => ({ c: r[0], m: r[1], n: Math.round(+r[2]), k: Math.min(Math.round(+r[3]), Math.round(+r[2])) }));
+  if (!rows.length) { $('tab').innerHTML = '<tbody><tr><td>No valid rows. Format: contaminant; food; samples; non-compliant.</td></tr></tbody>'; return; }
+  const byC = {}; rows.forEach(r => { byC[r.c] = byC[r.c] || { n: 0, k: 0 }; byC[r.c].n += r.n; byC[r.c].k += r.k; });
+  rows.forEach(r => { const a = r.k, b = r.n - r.k, c = byC[r.c].k - r.k, d = byC[r.c].n - r.n - c;
+    r.p = c + d > 0 ? fisherGreater(a, b, c, d) : 1; const h = [a, b, c, d].some(v => v === 0) ? 0.5 : 0;
+    r.or = (a + h) * (d + h) / ((b + h) * (c + h)); r.rate = r.k / r.n; r.ci = wilson(r.k, r.n); });
+  const q = bh(rows.map(r => r.p)); rows.forEach((r, i) => r.q = q[i]);
+  const thr = +$('q').value, N = rows.reduce((s, r) => s + r.n, 0), K = rows.reduce((s, r) => s + r.k, 0), sig = rows.filter(r => r.q < thr && r.or > 1);
+  $('m1').textContent = Lab.int(N); $('m2').textContent = Lab.pct(K / N); $('m3').textContent = `${sig.length} of ${rows.length}`;
+  rows.sort((x, y) => x.q - y.q);
+  $('headline').textContent = sig.length ? `Most critical pair: ${rows[0].c} in ${rows[0].m.toLowerCase()}, ${Lab.pct(rows[0].rate)} of samples over the limit.` : 'No pair passes the chosen significance threshold.';
+  const mx = Math.max(...rows.map(r => r.ci[1]));
+  $('tab').innerHTML = '<thead><tr><th>Contaminant</th><th>Food</th><th>Samples</th><th>Non-comp.</th><th>Rate (95% CI)</th><th></th><th>OR</th><th>q (FDR)</th></tr></thead><tbody>' +
+    rows.map(r => `<tr><td>${r.c}</td><td>${r.m}</td><td>${Lab.int(r.n)}</td><td>${Lab.int(r.k)}</td><td>${Lab.pct(r.rate)}<small>${Lab.pct(r.ci[0])}–${Lab.pct(r.ci[1])}</small></td>
+      <td><div class="ci"><span style="left:${r.ci[0] / mx * 100}%;width:${(r.ci[1] - r.ci[0]) / mx * 100}%"></span><b style="left:${r.rate / mx * 100}%"></b></div></td>
+      <td>${Lab.num(r.or, 2)}</td><td class="${r.q < thr && r.or > 1 ? 'flag' : ''}">${r.q < 0.001 ? '< 0.001' : Lab.num(r.q, 3)}</td></tr>`).join('') + '</tbody>';
+}
+$('data').value = EXAMPLE;
+$('example').addEventListener('click', () => { $('data').value = EXAMPLE; render(); });
+$('data').addEventListener('input', render); $('q').addEventListener('input', render);
+render();
+})();
+</script>
+
+  </div>
+</section>
+
+<section class="section" style="padding-top:0">
+  <div class="wrap">
+    <footer>© 2026 Martina Castellucci · <a href="https://martinaa1408.github.io/">martinaa1408.github.io</a> · <a href="https://martinaa1408.github.io/privacy.html">Privacy Policy</a></footer>
+  </div>
+</section>
+</body>
+</html>

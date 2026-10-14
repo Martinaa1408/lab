@@ -1,0 +1,120 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>Rare events: ROC vs PR • Martina Castellucci Lab</title>
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="description" content="The same model scored with accuracy, ROC-AUC and PR-AUC as positives become rare.">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="style.css">
+  <link rel="stylesheet" href="lab.css">
+  <script defer src="main.js"></script>
+  <script src="lab.js"></script>
+</head>
+<body>
+<header class="topbar">
+  <div class="wrap topbar__inner">
+    <a class="brand" href="index.html"><span class="brand__dot"></span><span>Martina Castellucci · Lab</span></a>
+    <nav class="nav">
+      <button class="nav__toggle" id="navToggle" aria-expanded="false">Menu</button>
+      <ul class="nav__menu" id="navMenu">
+        <li><a class="nav__link" href="index.html#bio">Bioinformatics</a></li>
+        <li><a class="nav__link" href="index.html#clinical">Clinical statistics</a></li>
+        <li><a class="nav__link" href="index.html#ai">AI</a></li>
+        <li><a class="nav__link" href="index.html#food">Food safety</a></li>
+        <li><a class="nav__link" href="index.html#school">Teaching</a></li>
+        <li><a class="nav__link" href="https://martinaa1408.github.io/">My website ↗</a></li>
+      </ul>
+    </nav>
+  </div>
+</header>
+
+<section class="lab-hero">
+  <div class="wrap">
+    <p class="crumb"><a href="index.html">Lab</a> / <a href="index.html#ai">AI and machine learning</a></p>
+    <h1>Why accuracy lies when events are rare</h1>
+    <p class="subtitle">When only a few cases are positive, as with non-compliant food samples or rare diseases, a model can look excellent on accuracy and ROC while being of little use. The precision-recall curve tells the truer story.</p>
+  </div>
+</section>
+
+<section class="section">
+  <div class="wrap">
+<div class="tool">
+  <div class="card" id="ctl">
+    <label class="ctl" for="prev">Share of positive cases <span class="val" data-for="prev"></span>
+      <small>My thesis data ranged from about 3% to 19%</small>
+      <input type="range" id="prev" min="0.5" max="50" step="0.5" value="3" data-unit="%"></label>
+    <label class="ctl" for="skill">Model skill <span class="val" data-for="skill"></span>
+      <small>Distance between the score distributions</small>
+      <input type="range" id="skill" min="0" max="3.5" step="0.1" value="2"></label>
+    <label class="ctl" for="thr">Alert threshold on the score <span class="val" data-for="thr"></span>
+      <input type="range" id="thr" min="0.01" max="0.99" step="0.01" value="0.5"></label>
+    <button class="btn" type="button" id="reseed">New sample</button>
+  </div>
+  <div class="stack">
+    <div class="card">
+      <p class="headline" id="headline"></p>
+      <div class="metrics">
+        <div class="metric"><b id="acc"></b><span>Accuracy</span></div>
+        <div class="metric"><b id="base"></b><span>Accuracy of "always negative"</span></div>
+        <div class="metric"><b id="rocauc"></b><span>ROC-AUC</span></div>
+        <div class="metric alt"><b id="ap"></b><span>PR-AUC (average precision)</span></div>
+        <div class="metric alt"><b id="prec"></b><span>Precision at threshold</span></div>
+        <div class="metric alt"><b id="rec"></b><span>Recall at threshold</span></div>
+      </div>
+    </div>
+    <div class="two-col">
+      <div class="card"><h2 class="lab-h">ROC curve</h2><svg id="roc"></svg></div>
+      <div class="card"><h2 class="lab-h">Precision-recall curve</h2><svg id="pr"></svg><p class="note" style="margin-top:6px">Dashed line: a model guessing at random, equal to the share of positives.</p></div>
+    </div>
+  </div>
+</div>
+<style>.two-col{ display:grid; grid-template-columns:1fr 1fr; gap:18px; } @media (max-width:860px){ .two-col{ grid-template-columns:1fr; } }</style>
+<p class="note">10,000 simulated cases. Scores come from a logistic transform of two normal distributions whose distance is the model skill. Average precision computed as in scikit-learn (step-wise sum over recall). In my MSc thesis the model was selected on PR-AUC for this reason.</p>
+<script>
+function curves(cases) {
+  const s = cases.slice().sort((a, b) => b.s - a.s), P = s.filter(c => c.y).length, N = s.length - P;
+  let tp = 0, fp = 0, ap = 0, prevR = 0; const roc = [[0, 0]], pr = [];
+  for (let i = 0; i < s.length; i++) {
+    if (s[i].y) tp++; else fp++;
+    if (i < s.length - 1 && s[i + 1].s === s[i].s) continue;
+    const r = tp / P, p = tp / (tp + fp);
+    roc.push([fp / N, r]); pr.push([r, p]); ap += (r - prevR) * p; prevR = r;
+  }
+  let auc = 0; for (let i = 1; i < roc.length; i++) auc += (roc[i][0] - roc[i - 1][0]) * (roc[i][1] + roc[i - 1][1]) / 2;
+  return { roc, pr, auc, ap };
+}
+(() => {
+const $ = id => document.getElementById(id);
+let seed = 9;
+function render() {
+  const r = Lab.rng(seed), prev = +$('prev').value / 100, k = +$('skill').value, thr = +$('thr').value, cases = [];
+  for (let i = 0; i < 10000; i++) { const y = r() < prev ? 1 : 0; cases.push({ y, s: 1 / (1 + Math.exp(-(Lab.normal(r, y ? k / 2 : -k / 2, 1) - 1.5))) }); }
+  const c = curves(cases), P = cases.filter(x => x.y).length;
+  let tp = 0, fp = 0, tn = 0, fn = 0;
+  cases.forEach(x => { const a = x.s >= thr; if (a && x.y) tp++; else if (a) fp++; else if (x.y) fn++; else tn++; });
+  $('acc').textContent = Lab.pct((tp + tn) / cases.length); $('base').textContent = Lab.pct(1 - P / cases.length);
+  $('rocauc').textContent = Lab.num(c.auc, 3); $('ap').textContent = Lab.num(c.ap, 3);
+  $('prec').textContent = tp + fp ? Lab.pct(tp / (tp + fp)) : '–'; $('rec').textContent = Lab.pct(tp / P);
+  $('headline').textContent = tp + fp ? `With this threshold the model raises ${Lab.int(tp + fp)} alerts: ${Lab.int(tp)} are real and ${Lab.int(fp)} are false alarms.` : 'With this threshold the model raises no alerts at all.';
+  const cur = [fp / (fp + tn), tp / P];
+  Lab.chart($('roc'), { series: [{ points: [[0, 0], [1, 1]], color: Lab.C.line, dash: '5 5', width: 1.5 }, { points: c.roc, color: Lab.C.accent, area: true, areaOpacity: 0.08, dots: [[cur[0], cur[1], 6]] }],
+    xmin: 0, xmax: 1, ymin: 0, ymax: 1, width: 420, height: 380, xfmt: v => Math.round(v * 100) + '%', yfmt: v => Math.round(v * 100) + '%', xlab: 'False positive rate', ylab: 'True positive rate' });
+  Lab.chart($('pr'), { series: [{ points: [[0, P / cases.length], [1, P / cases.length]], color: Lab.C.line, dash: '5 5', width: 1.5 }, { points: c.pr, color: Lab.C.second, area: true, areaOpacity: 0.08, dots: tp + fp ? [[tp / P, tp / (tp + fp), 6]] : [] }],
+    xmin: 0, xmax: 1, ymin: 0, ymax: 1, width: 420, height: 380, xfmt: v => Math.round(v * 100) + '%', yfmt: v => Math.round(v * 100) + '%', xlab: 'Recall', ylab: 'Precision' });
+}
+$('reseed').addEventListener('click', () => { seed++; render(); });
+Lab.bindRanges($('ctl'), render);
+})();
+</script>
+
+  </div>
+</section>
+
+<section class="section" style="padding-top:0">
+  <div class="wrap">
+    <footer>© 2026 Martina Castellucci · <a href="https://martinaa1408.github.io/">martinaa1408.github.io</a> · <a href="https://martinaa1408.github.io/privacy.html">Privacy Policy</a></footer>
+  </div>
+</section>
+</body>
+</html>

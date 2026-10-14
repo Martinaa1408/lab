@@ -1,0 +1,149 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>k-means clustering • Martina Castellucci Lab</title>
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="description" content="Step through k-means on simulated patient profiles and choose k with the elbow plot.">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="style.css">
+  <link rel="stylesheet" href="lab.css">
+  <script defer src="main.js"></script>
+  <script src="lab.js"></script>
+</head>
+<body>
+<header class="topbar">
+  <div class="wrap topbar__inner">
+    <a class="brand" href="index.html"><span class="brand__dot"></span><span>Martina Castellucci · Lab</span></a>
+    <nav class="nav">
+      <button class="nav__toggle" id="navToggle" aria-expanded="false">Menu</button>
+      <ul class="nav__menu" id="navMenu">
+        <li><a class="nav__link" href="index.html#bio">Bioinformatics</a></li>
+        <li><a class="nav__link" href="index.html#clinical">Clinical statistics</a></li>
+        <li><a class="nav__link" href="index.html#ai">AI</a></li>
+        <li><a class="nav__link" href="index.html#food">Food safety</a></li>
+        <li><a class="nav__link" href="index.html#school">Teaching</a></li>
+        <li><a class="nav__link" href="https://martinaa1408.github.io/">My website ↗</a></li>
+      </ul>
+    </nav>
+  </div>
+</header>
+
+<section class="lab-hero">
+  <div class="wrap">
+    <p class="crumb"><a href="index.html">Lab</a> / <a href="index.html#ai">AI and machine learning</a></p>
+    <h1>Finding patient groups without labels</h1>
+    <p class="subtitle">k-means looks for groups in data no one has labelled. Step through the algorithm: assign each patient to the nearest centre, move each centre to the mean of its group, repeat. The elbow plot helps choose how many groups to look for.</p>
+  </div>
+</section>
+
+<section class="section">
+  <div class="wrap">
+<div class="tool">
+  <div class="card" id="ctl">
+    <label class="ctl" for="ktrue">Real groups in the data <span class="val" data-for="ktrue"></span>
+      <input type="range" id="ktrue" min="2" max="6" step="1" value="3"></label>
+    <label class="ctl" for="spread">Spread inside groups <span class="val" data-for="spread"></span>
+      <input type="range" id="spread" min="0.3" max="2" step="0.1" value="0.8"></label>
+    <label class="ctl" for="k">Groups to look for (k) <span class="val" data-for="k"></span>
+      <input type="range" id="k" min="1" max="8" step="1" value="3"></label>
+    <div class="btns">
+      <button class="btn btn--primary" type="button" id="stepBtn">One step</button>
+      <button class="btn" type="button" id="run">Run to convergence</button>
+      <button class="btn" type="button" id="restart">New start</button>
+    </div>
+  </div>
+  <div class="stack">
+    <div class="card">
+      <p class="headline" id="status"></p>
+      <div class="metrics">
+        <div class="metric"><b id="it">0</b><span>Iterations</span></div>
+        <div class="metric"><b id="inert"></b><span>Within-cluster sum of squares</span></div>
+        <div class="metric alt"><b id="agree"></b><span>Agreement with real groups (adjusted Rand)</span></div>
+      </div>
+    </div>
+    <div class="card">
+      <h2 class="lab-h">Patients by two biomarkers</h2>
+      <svg id="plot"></svg>
+      <div class="legend"><span>Colours: cluster found by k-means. Black dots: centres.</span></div>
+    </div>
+    <div class="card">
+      <h2 class="lab-h">Elbow plot</h2>
+      <svg id="elbow"></svg>
+      <p class="note" style="margin-top:8px">The bend in the curve, where adding a group stops helping much, is a common guide for k.</p>
+    </div>
+  </div>
+</div>
+<p class="note">Simulated, standardised biomarker values. Starting centres chosen with k-means++. The elbow curve uses the best of five runs for each k. Adjusted Rand index: 1 = same grouping as the real one, around 0 = no better than chance.</p>
+<script>
+const PAL = ['#7c5cff', '#0f9d8a', '#d1435b', '#c98a12', '#2f6fd1', '#9a4fb5', '#5b8c2a', '#5b5f6a'];
+const d2 = (a, b) => (a[0] - b[0]) ** 2 + (a[1] - b[1]) ** 2;
+function kmeansInit(X, k, r) {
+  const C = [X[Math.floor(r() * X.length)].slice()];
+  while (C.length < k) {
+    const D = X.map(x => Math.min(...C.map(c => d2(x, c)))), tot = D.reduce((s, v) => s + v, 0);
+    let u = r() * tot, i = 0; while (u > D[i] && i < X.length - 1) { u -= D[i]; i++; }
+    C.push(X[i].slice());
+  }
+  return C;
+}
+const assign = (X, C) => X.map(x => { let b = 0; C.forEach((c, j) => { if (d2(x, c) < d2(x, C[b])) b = j; }); return b; });
+function update(X, lab, C) { return C.map((c, j) => { const m = X.filter((_, i) => lab[i] === j); return m.length ? [m.reduce((s, x) => s + x[0], 0) / m.length, m.reduce((s, x) => s + x[1], 0) / m.length] : c; }); }
+const inertia = (X, lab, C) => X.reduce((s, x, i) => s + d2(x, C[lab[i]]), 0);
+function ari(a, b) {
+  const n = a.length, c2 = x => x * (x - 1) / 2, cont = {}, ra = {}, rb = {};
+  a.forEach((x, i) => { const k = x + ',' + b[i]; cont[k] = (cont[k] || 0) + 1; ra[x] = (ra[x] || 0) + 1; rb[b[i]] = (rb[b[i]] || 0) + 1; });
+  const sij = Object.values(cont).reduce((s, v) => s + c2(v), 0), sa = Object.values(ra).reduce((s, v) => s + c2(v), 0), sb = Object.values(rb).reduce((s, v) => s + c2(v), 0);
+  const exp = sa * sb / c2(n), mx = (sa + sb) / 2;
+  return mx === exp ? 1 : (sij - exp) / (mx - exp);
+}
+(() => {
+const $ = id => document.getElementById(id);
+let X, truth, C, lab, iter, seed = 4, conv;
+function makeData() {
+  const r = Lab.rng(seed), k = +$('ktrue').value, sp = +$('spread').value; X = []; truth = [];
+  const centres = Array.from({ length: k }, (_, j) => [3.2 * Math.cos(2 * Math.PI * j / k + 0.4), 3.2 * Math.sin(2 * Math.PI * j / k + 0.4)]);
+  for (let i = 0; i < 300; i++) { const j = i % k; X.push([Lab.normal(r, centres[j][0], sp), Lab.normal(r, centres[j][1], sp)]); truth.push(j); }
+}
+function start() { const r = Lab.rng(seed * 31 + +$('k').value); C = kmeansInit(X, +$('k').value, r); lab = assign(X, C); iter = 0; conv = false; }
+function oneStep() { const nc = update(X, lab, C), nl = assign(X, nc); conv = nl.every((v, i) => v === lab[i]) && nc.every((c, j) => d2(c, C[j]) < 1e-12); C = nc; lab = nl; iter++; }
+function elbow() {
+  const pts = [];
+  for (let k = 1; k <= 8; k++) {
+    let best = Infinity;
+    for (let s = 0; s < 5; s++) { const r = Lab.rng(1000 + k * 10 + s); let c = kmeansInit(X, k, r), l = assign(X, c);
+      for (let t = 0; t < 50; t++) { const nc = update(X, l, c), nl = assign(X, nc); const done = nl.every((v, i) => v === l[i]); c = nc; l = nl; if (done) break; }
+      best = Math.min(best, inertia(X, l, c)); }
+    pts.push([k, best]);
+  }
+  return pts;
+}
+let elbowPts;
+function render() {
+  $('it').textContent = iter; $('inert').textContent = Lab.num(inertia(X, lab, C), 1); $('agree').textContent = Lab.num(ari(lab, truth), 2);
+  $('status').textContent = conv ? `Converged after ${iter} iterations: no patient changes group.` : iter ? 'Each step reassigns patients and moves the centres.' : 'Centres placed with k-means++. Press "One step".';
+  Lab.chart($('plot'), { series: [], dots: X.map((x, i) => [x[0], x[1], PAL[lab[i] % 8], 3.5, 0.75]).concat(C.map(c => [c[0], c[1], '#101114', 9, 0.9])),
+    xmin: -6, xmax: 6, ymin: -6, ymax: 6, xlab: 'Biomarker 1 (z-score)', ylab: 'Biomarker 2 (z-score)', width: 560, height: 460 });
+  Lab.chart($('elbow'), { series: [{ points: elbowPts, color: Lab.C.accent, dots: elbowPts.map(p => [p[0], p[1], p[0] === +$('k').value ? 7 : 4]) }], xmin: 1, xmax: 8, ymin: 0, xticksAt: [1, 2, 3, 4, 5, 6, 7, 8], xlab: 'k', ylab: 'Within-cluster SS', height: 260 });
+}
+$('stepBtn').addEventListener('click', () => { if (!conv) oneStep(); render(); });
+$('run').addEventListener('click', () => { for (let t = 0; t < 100 && !conv; t++) oneStep(); render(); });
+$('restart').addEventListener('click', () => { seed++; start(); render(); });
+document.querySelectorAll('#ctl input').forEach(el => {
+  const out = document.querySelector(`[data-for="${el.id}"]`), upd = () => out && (out.textContent = el.value);
+  upd(); el.addEventListener('input', () => { upd(); if (el.id !== 'k') { makeData(); elbowPts = elbow(); } start(); render(); });
+});
+makeData(); elbowPts = elbow(); start(); render(); Lab.onResize(render);
+})();
+</script>
+
+  </div>
+</section>
+
+<section class="section" style="padding-top:0">
+  <div class="wrap">
+    <footer>© 2026 Martina Castellucci · <a href="https://martinaa1408.github.io/">martinaa1408.github.io</a> · <a href="https://martinaa1408.github.io/privacy.html">Privacy Policy</a></footer>
+  </div>
+</section>
+</body>
+</html>

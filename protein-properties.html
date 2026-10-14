@@ -1,0 +1,129 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>Protein properties • Martina Castellucci Lab</title>
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="description" content="Molecular weight, isoelectric point, extinction coefficient and Kyte-Doolittle hydropathy plot.">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="style.css">
+  <link rel="stylesheet" href="lab.css">
+  <script defer src="main.js"></script>
+  <script src="lab.js"></script>
+</head>
+<body>
+<header class="topbar">
+  <div class="wrap topbar__inner">
+    <a class="brand" href="index.html"><span class="brand__dot"></span><span>Martina Castellucci · Lab</span></a>
+    <nav class="nav">
+      <button class="nav__toggle" id="navToggle" aria-expanded="false">Menu</button>
+      <ul class="nav__menu" id="navMenu">
+        <li><a class="nav__link" href="index.html#bio">Bioinformatics</a></li>
+        <li><a class="nav__link" href="index.html#clinical">Clinical statistics</a></li>
+        <li><a class="nav__link" href="index.html#ai">AI</a></li>
+        <li><a class="nav__link" href="index.html#food">Food safety</a></li>
+        <li><a class="nav__link" href="index.html#school">Teaching</a></li>
+        <li><a class="nav__link" href="https://martinaa1408.github.io/">My website ↗</a></li>
+      </ul>
+    </nav>
+  </div>
+</header>
+
+<section class="lab-hero">
+  <div class="wrap">
+    <p class="crumb"><a href="index.html">Lab</a> / <a href="index.html#bio">Bioinformatics</a></p>
+    <h1>What a protein sequence tells you</h1>
+    <p class="subtitle">Paste an amino-acid sequence to compute its molecular weight, isoelectric point, extinction coefficient and hydropathy, with a sliding-window plot that highlights possible transmembrane segments.</p>
+  </div>
+</section>
+
+<section class="section">
+  <div class="wrap">
+<div class="tool">
+  <div class="card" id="ctl">
+    <label class="ctl" for="seq">Protein sequence (plain or FASTA)
+      <textarea id="seq" spellcheck="false" style="min-height:200px"></textarea></label>
+    <label class="ctl" for="win">Hydropathy window <span class="val" data-for="win"></span>
+      <small>19 is typical for transmembrane helices</small>
+      <input type="range" id="win" min="5" max="25" step="2" value="19" data-unit=" residues"></label>
+    <button class="btn" type="button" id="ex">Load example: insulin</button>
+  </div>
+  <div class="stack">
+    <div class="card">
+      <div class="metrics">
+        <div class="metric"><b id="len"></b><span>Length (aa)</span></div>
+        <div class="metric"><b id="mw"></b><span>Molecular weight</span></div>
+        <div class="metric"><b id="pi"></b><span>Isoelectric point</span></div>
+        <div class="metric alt"><b id="gravy"></b><span>GRAVY (mean hydropathy)</span></div>
+        <div class="metric alt"><b id="ext"></b><span>Extinction coeff. at 280 nm (M⁻¹cm⁻¹), reduced–oxidised</span></div>
+      </div>
+    </div>
+    <div class="card">
+      <h2 class="lab-h">Hydropathy plot (Kyte-Doolittle)</h2>
+      <svg id="hyd"></svg>
+      <div class="legend"><span><i style="background:#7c5cff"></i>Window average</span><span><i style="background:#d1435b"></i>1.6 threshold for a possible transmembrane segment</span></div>
+    </div>
+    <div class="card">
+      <h2 class="lab-h">Amino-acid composition</h2>
+      <svg id="comp"></svg>
+    </div>
+  </div>
+</div>
+<p class="note">Average residue masses (IUPAC), minus one water per peptide bond. pI by bisection with Bjellqvist-type pK values; extinction coefficient = 5500·W + 1490·Y (+125 per cystine pair when all cysteines are oxidised). Values match Biopython's ProteinAnalysis. The example is UniProt P01308.</p>
+<script>
+const W_AA = { A: 89.0932, C: 121.1582, D: 133.1027, E: 147.1293, F: 165.1891, G: 75.0666, H: 155.1546, I: 131.1729, K: 146.1876, L: 131.1729, M: 149.2113, N: 132.1179, P: 115.1305, Q: 146.1445, R: 174.201, S: 105.0926, T: 119.1192, V: 117.1463, W: 204.2252, Y: 181.1885 };
+const KD = { A: 1.8, R: -4.5, N: -3.5, D: -3.5, C: 2.5, Q: -3.5, E: -3.5, G: -0.4, H: -3.2, I: 4.5, L: 3.8, K: -3.9, M: 1.9, F: 2.8, P: -1.6, S: -0.8, T: -0.7, W: -0.9, Y: -1.3, V: 4.2 };
+function mw(s) { return [...s].reduce((t, c) => t + W_AA[c], 0) - 18.01528 * (s.length - 1); }
+function isoelectric(s) {
+  const pos = { K: 10.0, R: 12.0, H: 5.98 }, neg = { D: 4.05, E: 4.45, C: 9.0, Y: 10.0 };
+  const nterm = { A: 7.59, M: 7.0, S: 6.93, P: 8.36, T: 6.82, V: 7.44, E: 7.7 }[s[0]] ?? 7.5;
+  const cterm = { D: 4.55, E: 4.75 }[s[s.length - 1]] ?? 3.55;
+  const cnt = c => [...s].filter(x => x === c).length;
+  const charge = ph => {
+    let q = 10 ** nterm / (10 ** nterm + 10 ** ph) - 10 ** ph / (10 ** cterm + 10 ** ph);
+    for (const k in pos) q += cnt(k) * 10 ** pos[k] / (10 ** pos[k] + 10 ** ph);
+    for (const k in neg) q -= cnt(k) * 10 ** ph / (10 ** neg[k] + 10 ** ph);
+    return q;
+  };
+  let lo = 4.05, hi = 12, ph = 7.775;
+  if (charge(lo) < 0) { for (let i = 0; i < 1000 && charge(lo) < 0; i++) lo -= 1; }
+  if (charge(hi) > 0) { for (let i = 0; i < 1000 && charge(hi) > 0; i++) hi += 1; }
+  for (let i = 0; i < 200; i++) { ph = (lo + hi) / 2; if (charge(ph) > 0) lo = ph; else hi = ph; if (hi - lo < 1e-4) break; }
+  return ph;
+}
+(() => {
+const $ = id => document.getElementById(id);
+const EX = '>sp|P01308|INS_HUMAN Insulin\nMALWMRLLPLLALLALWGPDPAAAFVNQHLCGSHLVEALYLVCGERGFFYTPKTRREAEDLQVGQVELGGGPGAGSLQPLALEGSLQKRGIVEQCCTSICSLYQLENYCN';
+function render() {
+  const s = $('seq').value.split('\n').filter(l => !l.startsWith('>')).join('').toUpperCase().replace(/[^ACDEFGHIKLMNPQRSTVWY]/g, '');
+  if (!s) return;
+  const n = s.length, cnt = c => [...s].filter(x => x === c).length;
+  $('len').textContent = n; $('mw').textContent = Lab.num(mw(s) / 1000, 2) + ' kDa'; $('pi').textContent = Lab.num(isoelectric(s), 2);
+  $('gravy').textContent = Lab.num([...s].reduce((t, c) => t + KD[c], 0) / n, 3);
+  const e = 5500 * cnt('W') + 1490 * cnt('Y'), ec = e + 125 * Math.floor(cnt('C') / 2);
+  $('ext').textContent = `${Lab.int(e)}–${Lab.int(ec)}`;
+  const w = Math.min(+$('win').value, n), pts = [];
+  for (let i = 0; i + w <= n; i++) pts.push([i + (w + 1) / 2, [...s.slice(i, i + w)].reduce((t, c) => t + KD[c], 0) / w]);
+  const tm = []; let run = null;
+  pts.forEach(p => { if (p[1] >= 1.6) { if (!run) run = { x0: p[0] }; run.x1 = p[0]; } else if (run) { tm.push(run); run = null; } }); if (run) tm.push(run);
+  Lab.chart($('hyd'), { series: [{ points: pts.length ? pts : [[0, 0]], color: Lab.C.accent }], bands: tm.map(r => ({ x0: r.x0, x1: r.x1, color: Lab.C.bad, opacity: 0.12 })),
+    hlines: [{ y: 1.6, color: Lab.C.bad }, { y: 0, color: Lab.C.line }], xmin: 0, xmax: n, ymin: -4.5, ymax: 4.5, xlab: 'Residue position', ylab: 'Hydropathy', height: 260 });
+  const aas = 'AVILMFWCGPSTYNQHKRDE';
+  Lab.bars($('comp'), { labels: [...aas], series: [{ values: [...aas].map(a => cnt(a) / n * 100), color: Lab.C.second }], ylab: '% of residues', yfmt: v => Lab.num(v, 0), height: 260 });
+}
+$('ex').addEventListener('click', () => { $('seq').value = EX; render(); });
+$('seq').value = EX;
+Lab.bindRanges($('ctl'), render);
+})();
+</script>
+
+  </div>
+</section>
+
+<section class="section" style="padding-top:0">
+  <div class="wrap">
+    <footer>© 2026 Martina Castellucci · <a href="https://martinaa1408.github.io/">martinaa1408.github.io</a> · <a href="https://martinaa1408.github.io/privacy.html">Privacy Policy</a></footer>
+  </div>
+</section>
+</body>
+</html>

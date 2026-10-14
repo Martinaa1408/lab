@@ -1,0 +1,111 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>Epidemic simulator • Martina Castellucci Lab</title>
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="description" content="SIR model with vaccination and contact reduction, for lessons on prevention and herd immunity.">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="style.css">
+  <link rel="stylesheet" href="lab.css">
+  <script defer src="main.js"></script>
+  <script src="lab.js"></script>
+</head>
+<body>
+<header class="topbar">
+  <div class="wrap topbar__inner">
+    <a class="brand" href="index.html"><span class="brand__dot"></span><span>Martina Castellucci · Lab</span></a>
+    <nav class="nav">
+      <button class="nav__toggle" id="navToggle" aria-expanded="false">Menu</button>
+      <ul class="nav__menu" id="navMenu">
+        <li><a class="nav__link" href="index.html#bio">Bioinformatics</a></li>
+        <li><a class="nav__link" href="index.html#clinical">Clinical statistics</a></li>
+        <li><a class="nav__link" href="index.html#ai">AI</a></li>
+        <li><a class="nav__link" href="index.html#food">Food safety</a></li>
+        <li><a class="nav__link" href="index.html#school">Teaching</a></li>
+        <li><a class="nav__link" href="https://martinaa1408.github.io/">My website ↗</a></li>
+      </ul>
+    </nav>
+  </div>
+</header>
+
+<section class="lab-hero">
+  <div class="wrap">
+    <p class="crumb"><a href="index.html">Lab</a> / <a href="index.html#school">Teaching</a></p>
+    <h1>How an epidemic is stopped</h1>
+    <p class="subtitle">An SIR model of a town of 10,000 people. Everyone is susceptible, infected or recovered. Change vaccination coverage and contacts and see when the curve flattens.</p>
+  </div>
+</section>
+
+<section class="section">
+  <div class="wrap">
+<div class="tool">
+  <div class="card" id="ctl">
+    <label class="ctl" for="r0">R₀ of the disease <span class="val" data-for="r0"></span>
+      <small>Infections caused by one case in a fully susceptible town</small>
+      <input type="range" id="r0" min="1" max="15" step="0.1" value="3"></label>
+    <label class="ctl" for="vac">Vaccination coverage <span class="val" data-for="vac"></span>
+      <input type="range" id="vac" min="0" max="98" step="1" value="40" data-unit="%"></label>
+    <label class="ctl" for="eff">Vaccine effectiveness <span class="val" data-for="eff"></span>
+      <input type="range" id="eff" min="30" max="100" step="1" value="90" data-unit="%"></label>
+    <label class="ctl" for="cut">Contact reduction <span class="val" data-for="cut"></span>
+      <small>Masks, distancing, hand hygiene</small>
+      <input type="range" id="cut" min="0" max="80" step="1" value="0" data-unit="%"></label>
+    <label class="ctl" for="dur">Infectious period <span class="val" data-for="dur"></span>
+      <input type="range" id="dur" min="3" max="21" step="1" value="7" data-unit=" days"></label>
+    <div class="btns"><button class="btn" type="button" data-preset="2.5,0,90,0,5">Seasonal flu</button><button class="btn" type="button" data-preset="15,92,97,0,8">Measles</button></div>
+  </div>
+  <div class="stack">
+    <div class="card">
+      <p class="headline" id="headline"></p>
+      <div class="metrics">
+        <div class="metric"><b id="rt"></b><span>Effective R at the start</span></div>
+        <div class="metric"><b id="herd"></b><span>Coverage needed for herd immunity</span></div>
+        <div class="metric alt"><b id="peak"></b><span>Infected at the peak</span></div>
+        <div class="metric alt"><b id="tot"></b><span>People infected in total</span></div>
+      </div>
+    </div>
+    <div class="card">
+      <h2 class="lab-h">Over time</h2>
+      <svg id="sir"></svg>
+      <div class="legend"><span><i style="background:#8a8fa0"></i>Susceptible</span><span><i style="background:#d1435b"></i>Infected</span><span><i style="background:#0f9d8a"></i>Recovered</span><span><i style="background:#7c5cff"></i>Protected by vaccine</span></div>
+    </div>
+  </div>
+</div>
+<p class="note">Deterministic SIR model (Kermack-McKendrick) integrated with a 0.1-day step. Herd immunity threshold = (1 − 1/R) / vaccine effectiveness. The model ignores age, seasonality and waning immunity. For teaching.</p>
+<script>
+(() => {
+const $ = id => document.getElementById(id);
+function render() {
+  const N = 10000, R0 = +$('r0').value, vac = +$('vac').value / 100, eff = +$('eff').value / 100, cut = +$('cut').value / 100, g = 1 / +$('dur').value, beta = R0 * (1 - cut) * g;
+  const V = N * vac * eff; let S = N - V - 10, I = 10, R = 0, peak = I, peakDay = 0;
+  const ps = [], pi = [], pr = [], pv = [];
+  for (let k = 0; k <= 2400; k++) {
+    const t = k * 0.1; if (k % 10 === 0) { ps.push([t, S]); pi.push([t, I]); pr.push([t, R]); pv.push([t, V]); }
+    const inf = beta * S * I / N * 0.1, rec = g * I * 0.1; S -= inf; I += inf - rec; R += rec;
+    if (I > peak) { peak = I; peakDay = t; }
+  }
+  const Rt = R0 * (1 - cut) * (N - V) / N, herd = (1 - 1 / (R0 * (1 - cut))) / eff;
+  $('rt').textContent = Lab.num(Rt, 2); $('herd').textContent = herd <= 0 ? 'not needed' : herd > 1 ? 'out of reach' : Lab.pct(herd, 0);
+  $('peak').textContent = Lab.int(peak); $('tot').textContent = Lab.int(R + I);
+  $('headline').textContent = Rt < 1 ? 'Effective R is below 1: the outbreak dies out on its own.' : `The epidemic grows and peaks after about ${Math.round(peakDay)} days.`;
+  Lab.chart($('sir'), { series: [{ points: pv, color: Lab.C.accent, dash: '6 4', width: 2 }, { points: ps, color: Lab.C.muted }, { points: pr, color: Lab.C.second }, { points: pi, color: Lab.C.bad, area: true }],
+    xmin: 0, xmax: 240, ymin: 0, ymax: N, xlab: 'Days', ylab: 'People', yfmt: v => Lab.int(v) });
+}
+document.querySelectorAll('[data-preset]').forEach(b => b.addEventListener('click', () => {
+  const v = b.dataset.preset.split(','); ['r0', 'vac', 'eff', 'cut', 'dur'].forEach((id, i) => { $(id).value = v[i]; $(id).dispatchEvent(new Event('input')); });
+}));
+Lab.bindRanges($('ctl'), render);
+})();
+</script>
+
+  </div>
+</section>
+
+<section class="section" style="padding-top:0">
+  <div class="wrap">
+    <footer>© 2026 Martina Castellucci · <a href="https://martinaa1408.github.io/">martinaa1408.github.io</a> · <a href="https://martinaa1408.github.io/privacy.html">Privacy Policy</a></footer>
+  </div>
+</section>
+</body>
+</html>

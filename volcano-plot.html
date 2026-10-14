@@ -1,0 +1,127 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>Volcano plot • Martina Castellucci Lab</title>
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="description" content="Differential expression results on a volcano plot, with FDR correction and adjustable thresholds.">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="style.css">
+  <link rel="stylesheet" href="lab.css">
+  <script defer src="main.js"></script>
+  <script src="lab.js"></script>
+</head>
+<body>
+<header class="topbar">
+  <div class="wrap topbar__inner">
+    <a class="brand" href="index.html"><span class="brand__dot"></span><span>Martina Castellucci · Lab</span></a>
+    <nav class="nav">
+      <button class="nav__toggle" id="navToggle" aria-expanded="false">Menu</button>
+      <ul class="nav__menu" id="navMenu">
+        <li><a class="nav__link" href="index.html#bio">Bioinformatics</a></li>
+        <li><a class="nav__link" href="index.html#clinical">Clinical statistics</a></li>
+        <li><a class="nav__link" href="index.html#ai">AI</a></li>
+        <li><a class="nav__link" href="index.html#food">Food safety</a></li>
+        <li><a class="nav__link" href="index.html#school">Teaching</a></li>
+        <li><a class="nav__link" href="https://martinaa1408.github.io/">My website ↗</a></li>
+      </ul>
+    </nav>
+  </div>
+</header>
+
+<section class="lab-hero">
+  <div class="wrap">
+    <p class="crumb"><a href="index.html">Lab</a> / <a href="index.html#bio">Bioinformatics</a></p>
+    <h1>Which genes really change?</h1>
+    <p class="subtitle">A differential expression experiment tests thousands of genes at once. The volcano plot shows effect size against evidence. Set the fold-change and false-discovery thresholds, or paste your own results.</p>
+  </div>
+</section>
+
+<section class="section">
+  <div class="wrap">
+<div class="tool">
+  <div class="card" id="ctl">
+    <label class="ctl" for="fc">|log2 fold change| at least <span class="val" data-for="fc"></span>
+      <input type="range" id="fc" min="0" max="3" step="0.1" value="1"></label>
+    <label class="ctl">FDR at most
+      <select id="q"><option value="0.01">1%</option><option value="0.05" selected>5%</option><option value="0.1">10%</option></select></label>
+    <label class="ctl" for="data">Your results (optional)
+      <small>CSV with columns gene, log2FC, p-value. Leave empty for simulated data.</small>
+      <textarea id="data" spellcheck="false" placeholder="gene,log2FC,pvalue&#10;TP53,1.8,0.00002&#10;MYC,-2.1,0.0001"></textarea></label>
+    <div class="btns"><button class="btn" type="button" id="sim">New simulated experiment</button></div>
+  </div>
+  <div class="stack">
+    <div class="card">
+      <div class="metrics">
+        <div class="metric"><b id="tot"></b><span>Genes tested</span></div>
+        <div class="metric"><b id="up" style="color:#d1435b"></b><span>Up-regulated</span></div>
+        <div class="metric"><b id="down" style="color:#2f6fd1"></b><span>Down-regulated</span></div>
+        <div class="metric alt"><b id="raw"></b><span>p &lt; 0.05 before correction</span></div>
+      </div>
+    </div>
+    <div class="card">
+      <h2 class="lab-h">Volcano plot</h2>
+      <svg id="vol"></svg>
+      <div class="legend"><span><i style="background:#d1435b"></i>Up</span><span><i style="background:#2f6fd1"></i>Down</span><span><i style="background:#c9c7d4"></i>Not significant</span></div>
+    </div>
+    <div class="card">
+      <h2 class="lab-h">Top genes by adjusted p-value</h2>
+      <div class="scroll"><table class="data" id="tab"></table></div>
+    </div>
+  </div>
+</div>
+<p class="note">Simulated data: 5,000 genes, about 8% truly changed, with gene-specific noise. Benjamini-Hochberg adjustment over all genes. The gap between "p &lt; 0.05" and the significant genes shows how many false positives the correction removes.</p>
+<script>
+function bh(ps) {
+  const m = ps.length, idx = ps.map((p, i) => [p, i]).sort((a, b) => a[0] - b[0]), q = new Array(m); let prev = 1;
+  for (let r = m; r >= 1; r--) { const [p, i] = idx[r - 1]; prev = Math.min(prev, p * m / r); q[i] = prev; } return q;
+}
+(() => {
+const $ = id => document.getElementById(id);
+let seed = 3, sim = null;
+function simulate() {
+  const r = Lab.rng(seed), genes = [];
+  for (let i = 0; i < 5000; i++) {
+    const de = r() < 0.08, eff = de ? (r() < 0.5 ? -1 : 1) * (0.6 + Math.abs(Lab.normal(r, 0, 1.2))) : 0;
+    const se = 0.35 + 0.6 * r(), est = eff + Lab.normal(r, 0, se), z = est / se;
+    genes.push({ gene: 'GENE' + String(i + 1).padStart(4, '0'), fc: est, p: Math.max(1e-300, 2 * (1 - Lab.pnorm(Math.abs(z)))) });
+  }
+  return genes;
+}
+function parse() {
+  const t = $('data').value.trim(); if (!t) return null;
+  const rows = t.split('\n').map(l => l.split(/[,;\t]/).map(x => x.trim())).filter(r => r.length >= 3 && isFinite(+r[1]) && isFinite(+r[2]) && r[2] !== '');
+  return rows.length ? rows.map(r => ({ gene: r[0], fc: +r[1], p: Math.max(1e-300, +r[2]) })) : null;
+}
+function render() {
+  const genes = parse() || (sim = sim || simulate()), fc = +$('fc').value, qt = +$('q').value, q = bh(genes.map(g => g.p));
+  genes.forEach((g, i) => { g.q = q[i]; g.cls = g.q <= qt && g.fc >= fc ? 'up' : g.q <= qt && g.fc <= -fc ? 'down' : 'ns'; });
+  $('tot').textContent = Lab.int(genes.length); $('up').textContent = genes.filter(g => g.cls === 'up').length;
+  $('down').textContent = genes.filter(g => g.cls === 'down').length; $('raw').textContent = Lab.int(genes.filter(g => g.p < 0.05).length);
+  const col = { up: Lab.C.bad, down: '#2f6fd1', ns: '#c9c7d4' }, ymax = Math.min(40, Math.max(...genes.map(g => -Math.log10(g.p)))) * 1.05;
+  const sorted = genes.slice().sort((a, b) => (a.cls !== 'ns') - (b.cls !== 'ns'));
+  const lim = Math.max(3, Math.ceil(Math.max(...genes.map(g => Math.abs(g.fc)))));
+  const pthr = Math.max(...genes.filter(g => g.q <= qt).map(g => g.p), 0);
+  Lab.chart($('vol'), { series: [], dots: sorted.map(g => [Math.max(-lim, Math.min(lim, g.fc)), Math.min(ymax, -Math.log10(g.p)), col[g.cls], g.cls === 'ns' ? 2.2 : 3, g.cls === 'ns' ? 0.6 : 0.85, `${g.gene}: log2FC ${g.fc.toFixed(2)}, q ${g.q.toExponential(1)}`]),
+    xmin: -lim, xmax: lim, ymin: 0, ymax, xlab: 'log2 fold change', ylab: '−log10 p-value', height: 380,
+    vlines: fc > 0 ? [{ x: -fc, color: Lab.C.muted }, { x: fc, color: Lab.C.muted }] : [], hlines: pthr > 0 ? [{ y: -Math.log10(pthr), color: Lab.C.muted, label: `FDR ${qt * 100}%` }] : [] });
+  const top = genes.filter(g => g.cls !== 'ns').sort((a, b) => a.q - b.q).slice(0, 12);
+  $('tab').innerHTML = top.length ? '<thead><tr><th>Gene</th><th>log2FC</th><th>p-value</th><th>Adjusted p</th><th>Direction</th></tr></thead><tbody>' +
+    top.map(g => `<tr><td>${g.gene}</td><td>${g.fc.toFixed(2)}</td><td>${g.p.toExponential(2)}</td><td>${g.q.toExponential(2)}</td><td>${g.cls === 'up' ? '<span class="tag bad">up</span>' : '<span class="tag">down</span>'}</td></tr>`).join('') + '</tbody>'
+    : '<tbody><tr><td>No gene passes both thresholds.</td></tr></tbody>';
+}
+$('sim').addEventListener('click', () => { $('data').value = ''; seed++; sim = null; render(); });
+Lab.bindRanges($('ctl'), render);
+})();
+</script>
+
+  </div>
+</section>
+
+<section class="section" style="padding-top:0">
+  <div class="wrap">
+    <footer>© 2026 Martina Castellucci · <a href="https://martinaa1408.github.io/">martinaa1408.github.io</a> · <a href="https://martinaa1408.github.io/privacy.html">Privacy Policy</a></footer>
+  </div>
+</section>
+</body>
+</html>

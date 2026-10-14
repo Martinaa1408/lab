@@ -1,0 +1,147 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>Survival curves • Martina Castellucci Lab</title>
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="description" content="Run a simulated two-arm trial as many times as you like and see when the effect becomes visible.">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="style.css">
+  <link rel="stylesheet" href="lab.css">
+  <script defer src="main.js"></script>
+  <script src="lab.js"></script>
+</head>
+<body>
+<header class="topbar">
+  <div class="wrap topbar__inner">
+    <a class="brand" href="index.html"><span class="brand__dot"></span><span>Martina Castellucci · Lab</span></a>
+    <nav class="nav">
+      <button class="nav__toggle" id="navToggle" aria-expanded="false">Menu</button>
+      <ul class="nav__menu" id="navMenu">
+        <li><a class="nav__link" href="index.html#bio">Bioinformatics</a></li>
+        <li><a class="nav__link" href="index.html#clinical">Clinical statistics</a></li>
+        <li><a class="nav__link" href="index.html#ai">AI</a></li>
+        <li><a class="nav__link" href="index.html#food">Food safety</a></li>
+        <li><a class="nav__link" href="index.html#school">Teaching</a></li>
+        <li><a class="nav__link" href="https://martinaa1408.github.io/">My website ↗</a></li>
+      </ul>
+    </nav>
+  </div>
+</header>
+
+<section class="lab-hero">
+  <div class="wrap">
+    <p class="crumb"><a href="index.html">Lab</a> / <a href="index.html#clinical">Clinical statistics</a></p>
+    <h1>Does a new treatment extend survival?</h1>
+    <p class="subtitle">A simulated two-arm clinical trial. Choose how well the new treatment really works and how many patients you enrol, then see whether the Kaplan-Meier curves and the log-rank test can detect it.</p>
+  </div>
+</section>
+
+<section class="section">
+  <div class="wrap">
+<div class="tool">
+  <div class="card" id="ctl">
+    <label class="ctl" for="hr">True hazard ratio <span class="val" data-for="hr"></span>
+      <small>Below 1 the new treatment lowers the risk of the event</small>
+      <input type="range" id="hr" min="0.3" max="1.5" step="0.05" value="0.7"></label>
+    <label class="ctl" for="med">Median survival, standard care <span class="val" data-for="med"></span>
+      <input type="range" id="med" min="6" max="48" step="1" value="18" data-unit=" months"></label>
+    <label class="ctl" for="n">Patients per arm <span class="val" data-for="n"></span>
+      <input type="range" id="n" min="20" max="500" step="10" value="120"></label>
+    <label class="ctl" for="fu">Follow-up <span class="val" data-for="fu"></span>
+      <small>Patients without an event by then are censored</small>
+      <input type="range" id="fu" min="12" max="72" step="6" value="36" data-unit=" months"></label>
+    <button class="btn btn--primary" id="reseed" type="button">Run the trial again</button>
+  </div>
+  <div class="stack">
+    <div class="card">
+      <p class="headline" id="verdict"></p>
+      <div class="metrics">
+        <div class="metric"><b id="m0"></b><span>Median, standard care</span></div>
+        <div class="metric alt"><b id="m1"></b><span>Median, new treatment</span></div>
+        <div class="metric"><b id="hrest"></b><span>Estimated hazard ratio</span></div>
+        <div class="metric"><b id="p"></b><span>Log-rank p-value</span></div>
+      </div>
+    </div>
+    <div class="card">
+      <h2 class="lab-h">Kaplan-Meier curves</h2>
+      <svg id="km"></svg>
+      <div class="legend"><span><i style="background:#8a8fa0"></i>Standard care</span><span><i style="background:#0f9d8a"></i>New treatment</span><span>Tick marks are censored patients</span></div>
+    </div>
+    <div class="card">
+      <h2 class="lab-h">Number at risk</h2>
+      <div class="scroll"><table class="data" id="risk"></table></div>
+    </div>
+  </div>
+</div>
+<p class="note">Exponential event times, 10% random drop-out, administrative censoring at the end of follow-up. Kaplan-Meier estimator, log-rank test (χ², 1 df), hazard ratio estimated as (O₁/E₁)/(O₀/E₀). Results match statsmodels' survdiff. For learning only.</p>
+<script>
+let seed = 11;
+function simulateArm(r, n, lambda, fu) {
+  const out = [];
+  for (let i = 0; i < n; i++) {
+    const t = -Math.log(1 - r()) / lambda, drop = r() < 0.1 ? r() * fu : Infinity, c = Math.min(fu, drop);
+    out.push(t <= c ? { t, e: 1 } : { t: c, e: 0 });
+  }
+  return out.sort((a, b) => a.t - b.t);
+}
+function km(arm) {
+  let s = 1, atRisk = arm.length;
+  const pts = [[0, 1]], cens = [];
+  [...new Set(arm.map(x => x.t))].forEach(t => {
+    const here = arm.filter(x => x.t === t), d = here.filter(x => x.e).length;
+    if (d) { s *= 1 - d / atRisk; pts.push([t, s]); }
+    here.filter(x => !x.e).forEach(() => cens.push([t, s]));
+    atRisk -= here.length;
+  });
+  return { pts, cens };
+}
+function logrank(a0, a1) {
+  const all = [...a0.map(x => ({ ...x, g: 0 })), ...a1.map(x => ({ ...x, g: 1 }))];
+  const times = [...new Set(all.filter(x => x.e).map(x => x.t))].sort((a, b) => a - b);
+  let O0 = 0, E0 = 0, O1 = 0, E1 = 0, V = 0;
+  times.forEach(t => {
+    const n0 = all.filter(x => x.g === 0 && x.t >= t).length, n1 = all.filter(x => x.g === 1 && x.t >= t).length;
+    const d0 = all.filter(x => x.g === 0 && x.t === t && x.e).length, d1 = all.filter(x => x.g === 1 && x.t === t && x.e).length;
+    const n = n0 + n1, d = d0 + d1;
+    if (n < 1) return;
+    O0 += d0; O1 += d1; E0 += d * n0 / n; E1 += d * n1 / n;
+    if (n > 1) V += d * (n0 / n) * (n1 / n) * (n - d) / (n - 1);
+  });
+  return { p: Lab.pchisq1(V > 0 ? (O1 - E1) ** 2 / V : 0), hr: (O1 / E1) / (O0 / E0) };
+}
+(() => {
+const $ = id => document.getElementById(id);
+const median = pts => { const p = pts.find(q => q[1] <= 0.5); return p ? p[0] : NaN; };
+function render() {
+  const r = Lab.rng(seed), n = +$('n').value, fu = +$('fu').value, hr = +$('hr').value, l0 = Math.log(2) / +$('med').value;
+  const a0 = simulateArm(r, n, l0, fu), a1 = simulateArm(r, n, l0 * hr, fu), k0 = km(a0), k1 = km(a1), lr = logrank(a0, a1);
+  const fm = m => isFinite(m) ? Lab.num(m, 1) + ' months' : 'not reached';
+  $('m0').textContent = fm(median(k0.pts)); $('m1').textContent = fm(median(k1.pts));
+  $('hrest').textContent = Lab.num(lr.hr, 2); $('p').textContent = lr.p < 0.001 ? '< 0.001' : Lab.num(lr.p, 3);
+  $('verdict').textContent = lr.p < 0.05 ? (lr.hr < 1 ? 'The trial shows a benefit of the new treatment (p < 0.05).' : 'The trial shows the new treatment shortens survival (p < 0.05).')
+    : 'The trial finds no significant difference between the arms.';
+  const ext = p => p.concat([[fu, p[p.length - 1][1]]]);
+  Lab.chart($('km'), { series: [{ points: ext(k0.pts), step: true, color: Lab.C.muted, marks: k0.cens }, { points: ext(k1.pts), step: true, color: Lab.C.second, marks: k1.cens },
+      { points: [[0, 0.5], [fu, 0.5]], color: Lab.C.line, dash: '3 4', width: 1 }],
+    xmin: 0, xmax: fu, ymin: 0, ymax: 1, yfmt: v => Math.round(v * 100) + '%', xlab: 'Months since randomisation', ylab: 'Survival probability' });
+  const cols = []; for (let t = 0; t <= fu; t += fu > 36 ? 12 : 6) cols.push(t);
+  const atr = (a, t) => a.filter(x => x.t >= t).length;
+  $('risk').innerHTML = `<thead><tr><th>Month</th>${cols.map(c => `<th>${c}</th>`).join('')}</tr></thead><tbody>
+    <tr><td>Standard</td>${cols.map(c => `<td>${atr(a0, c)}</td>`).join('')}</tr><tr><td>New</td>${cols.map(c => `<td>${atr(a1, c)}</td>`).join('')}</tr></tbody>`;
+}
+$('reseed').addEventListener('click', () => { seed++; render(); });
+Lab.bindRanges($('ctl'), render);
+})();
+</script>
+
+  </div>
+</section>
+
+<section class="section" style="padding-top:0">
+  <div class="wrap">
+    <footer>© 2026 Martina Castellucci · <a href="https://martinaa1408.github.io/">martinaa1408.github.io</a> · <a href="https://martinaa1408.github.io/privacy.html">Privacy Policy</a></footer>
+  </div>
+</section>
+</body>
+</html>

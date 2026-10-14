@@ -1,0 +1,121 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>Trend test • Martina Castellucci Lab</title>
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="description" content="Mann-Kendall trend test and Sen&#x27;s slope for any monthly series, such as non-compliance rates.">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="style.css">
+  <link rel="stylesheet" href="lab.css">
+  <script defer src="main.js"></script>
+  <script src="lab.js"></script>
+</head>
+<body>
+<header class="topbar">
+  <div class="wrap topbar__inner">
+    <a class="brand" href="index.html"><span class="brand__dot"></span><span>Martina Castellucci · Lab</span></a>
+    <nav class="nav">
+      <button class="nav__toggle" id="navToggle" aria-expanded="false">Menu</button>
+      <ul class="nav__menu" id="navMenu">
+        <li><a class="nav__link" href="index.html#bio">Bioinformatics</a></li>
+        <li><a class="nav__link" href="index.html#clinical">Clinical statistics</a></li>
+        <li><a class="nav__link" href="index.html#ai">AI</a></li>
+        <li><a class="nav__link" href="index.html#food">Food safety</a></li>
+        <li><a class="nav__link" href="index.html#school">Teaching</a></li>
+        <li><a class="nav__link" href="https://martinaa1408.github.io/">My website ↗</a></li>
+      </ul>
+    </nav>
+  </div>
+</header>
+
+<section class="lab-hero">
+  <div class="wrap">
+    <p class="crumb"><a href="index.html">Lab</a> / <a href="index.html#food">Food safety</a></p>
+    <h1>Is non-compliance really increasing?</h1>
+    <p class="subtitle">Monthly rates jump up and down, so a trend is hard to judge by eye. The Mann-Kendall test asks whether later months tend to be higher than earlier ones, without assuming a straight line or normal data. Sen's slope estimates how fast.</p>
+  </div>
+</section>
+
+<section class="section">
+  <div class="wrap">
+<div class="tool">
+  <div class="card" id="ctl">
+    <label class="ctl" for="data">Monthly values, oldest first
+      <small>One per line or separated by commas</small>
+      <textarea id="data" spellcheck="false" style="min-height:220px"></textarea></label>
+    <label class="ctl" for="trend">Simulated trend <span class="val" data-for="trend"></span>
+      <small>Change per year, used by the button below</small>
+      <input type="range" id="trend" min="-3" max="3" step="0.1" value="0.8" data-unit=" points"></label>
+    <label class="ctl" for="noise">Simulated noise <span class="val" data-for="noise"></span>
+      <input type="range" id="noise" min="0.2" max="4" step="0.1" value="1.2"></label>
+    <button class="btn" type="button" id="sim">Simulate 36 months</button>
+  </div>
+  <div class="stack">
+    <div class="card">
+      <p class="headline" id="headline"></p>
+      <div class="metrics">
+        <div class="metric"><b id="s"></b><span>Mann-Kendall S</span></div>
+        <div class="metric"><b id="tau"></b><span>Kendall's tau</span></div>
+        <div class="metric"><b id="p"></b><span>p-value (two-sided)</span></div>
+        <div class="metric alt"><b id="sen"></b><span>Sen's slope per year</span></div>
+      </div>
+    </div>
+    <div class="card">
+      <h2 class="lab-h">Series and Sen's trend line</h2>
+      <svg id="plot"></svg>
+      <div class="legend"><span><i style="background:#7c5cff"></i>Monthly value</span><span><i style="background:#d1435b"></i>Sen's slope line</span></div>
+    </div>
+  </div>
+</div>
+<p class="note">S = Σ sign(xⱼ − xᵢ) over all pairs i &lt; j; variance corrected for ties; Z with continuity correction. Sen's slope = median of all pairwise slopes, intercept = median(x) − slope·(n − 1)/2. Results match the pymannkendall package. Used for seasonal and long-term trends in my MSc thesis.</p>
+<script>
+function mannKendall(x) {
+  const n = x.length; let S = 0;
+  for (let i = 0; i < n - 1; i++) for (let j = i + 1; j < n; j++) S += Math.sign(x[j] - x[i]);
+  const ties = {}; x.forEach(v => ties[v] = (ties[v] || 0) + 1);
+  const tieTerm = Object.values(ties).reduce((s, t) => s + t * (t - 1) * (2 * t + 5), 0);
+  const v = (n * (n - 1) * (2 * n + 5) - tieTerm) / 18;
+  const z = S > 0 ? (S - 1) / Math.sqrt(v) : S < 0 ? (S + 1) / Math.sqrt(v) : 0;
+  const slopes = [];
+  for (let i = 0; i < n - 1; i++) for (let j = i + 1; j < n; j++) slopes.push((x[j] - x[i]) / (j - i));
+  const med = a => { const s = a.slice().sort((p, q) => p - q), m = s.length >> 1; return s.length % 2 ? s[m] : (s[m - 1] + s[m]) / 2; };
+  const slope = med(slopes), intercept = med(x) - (n - 1) / 2 * slope;
+  return { S, tau: S / (n * (n - 1) / 2), z, p: 2 * (1 - Lab.pnorm(Math.abs(z))), slope, intercept };
+}
+(() => {
+const $ = id => document.getElementById(id);
+let seed = 2;
+function simulate() {
+  const r = Lab.rng(seed++), tr = +$('trend').value / 12, nz = +$('noise').value, out = [];
+  for (let t = 0; t < 36; t++) out.push(Math.max(0, 5 + tr * t + 1.2 * Math.sin(2 * Math.PI * t / 12) + Lab.normal(r, 0, nz)).toFixed(2));
+  $('data').value = out.join('\n');
+}
+function render() {
+  const x = $('data').value.split(/[\s,;]+/).filter(t => t !== '').map(Number).filter(v => isFinite(v));
+  if (x.length < 4) { $('headline').textContent = 'Enter at least 4 values.'; return; }
+  const r = mannKendall(x);
+  $('s').textContent = r.S; $('tau').textContent = Lab.num(r.tau, 3); $('p').textContent = r.p < 0.001 ? '< 0.001' : Lab.num(r.p, 3);
+  $('sen').textContent = (r.slope >= 0 ? '+' : '') + Lab.num(r.slope * 12, 2);
+  $('headline').textContent = r.p < 0.05 ? `Significant ${r.slope > 0 ? 'increasing' : 'decreasing'} trend over ${x.length} months (p ${r.p < 0.001 ? '< 0.001' : '= ' + r.p.toFixed(3)}).` : `No significant trend over ${x.length} months (p = ${r.p.toFixed(3)}).`;
+  Lab.chart($('plot'), { series: [{ points: x.map((v, t) => [t + 1, v]), color: Lab.C.accent, dots: x.map((v, t) => [t + 1, v, 3]) },
+      { points: [[1, r.intercept], [x.length, r.intercept + r.slope * (x.length - 1)]], color: Lab.C.bad, dash: '6 4' }],
+    xmin: 1, xmax: x.length, ymin: Math.min(0, ...x), xlab: 'Month', ylab: 'Value', height: 300 });
+}
+$('sim').addEventListener('click', () => { simulate(); render(); });
+$('data').addEventListener('input', render);
+document.querySelectorAll('#ctl input[type=range]').forEach(el => { const out = document.querySelector(`[data-for="${el.id}"]`), upd = () => out.textContent = el.value + (el.dataset.unit || ''); upd(); el.addEventListener('input', upd); });
+simulate(); render(); Lab.onResize(render);
+})();
+</script>
+
+  </div>
+</section>
+
+<section class="section" style="padding-top:0">
+  <div class="wrap">
+    <footer>© 2026 Martina Castellucci · <a href="https://martinaa1408.github.io/">martinaa1408.github.io</a> · <a href="https://martinaa1408.github.io/privacy.html">Privacy Policy</a></footer>
+  </div>
+</section>
+</body>
+</html>

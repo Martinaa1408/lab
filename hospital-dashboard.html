@@ -1,0 +1,139 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>Hospital dashboard • Martina Castellucci Lab</title>
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="description" content="A one-year hospital dashboard on synthetic data, with filters and CSV download.">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="style.css">
+  <link rel="stylesheet" href="lab.css">
+  <script defer src="main.js"></script>
+  <script src="lab.js"></script>
+</head>
+<body>
+<header class="topbar">
+  <div class="wrap topbar__inner">
+    <a class="brand" href="index.html"><span class="brand__dot"></span><span>Martina Castellucci · Lab</span></a>
+    <nav class="nav">
+      <button class="nav__toggle" id="navToggle" aria-expanded="false">Menu</button>
+      <ul class="nav__menu" id="navMenu">
+        <li><a class="nav__link" href="index.html#bio">Bioinformatics</a></li>
+        <li><a class="nav__link" href="index.html#clinical">Clinical statistics</a></li>
+        <li><a class="nav__link" href="index.html#ai">AI</a></li>
+        <li><a class="nav__link" href="index.html#food">Food safety</a></li>
+        <li><a class="nav__link" href="index.html#school">Teaching</a></li>
+        <li><a class="nav__link" href="https://martinaa1408.github.io/">My website ↗</a></li>
+      </ul>
+    </nav>
+  </div>
+</header>
+
+<section class="lab-hero">
+  <div class="wrap">
+    <p class="crumb"><a href="index.html">Lab</a> / <a href="index.html#clinical">Clinical statistics</a></p>
+    <h1>Admissions dashboard of a simulated hospital</h1>
+    <p class="subtitle">One year of computer-generated admissions for a 180-bed hospital. The indicators are the ones used in healthcare management: volumes, length of stay, bed occupancy and 30-day readmissions.</p>
+  </div>
+</section>
+
+<section class="section">
+  <div class="wrap">
+<style>
+  .filters{ display:flex; flex-wrap:wrap; gap:16px; align-items:end; }
+  .filters .ctl{ margin:0; min-width:180px; flex:1 1 180px; }
+  .two{ display:grid; grid-template-columns:1fr 1fr; gap:18px; }
+  @media (max-width: 860px){ .two{ grid-template-columns:1fr; } }
+</style>
+<div class="stack">
+  <div class="card filters" id="ctl">
+    <label class="ctl">Ward<select id="rep"></select></label>
+    <label class="ctl">Setting<select id="reg"><option value="">All</option><option value="Inpatient">Inpatient</option><option value="Day hospital">Day hospital</option></select></label>
+    <label class="ctl">Age<select id="eta"><option value="">All</option><option value="0-64">Under 65</option><option value="65-79">65–79</option><option value="80-120">80 and over</option></select></label>
+    <button class="btn" id="csv" type="button">Download CSV</button>
+  </div>
+  <div class="card">
+    <div class="metrics">
+      <div class="metric"><b id="k1"></b><span>Admissions</span></div>
+      <div class="metric"><b id="k2"></b><span>Mean length of stay (days)</span></div>
+      <div class="metric"><b id="k3"></b><span>Bed occupancy</span></div>
+      <div class="metric alt"><b id="k4"></b><span>30-day readmissions</span></div>
+      <div class="metric alt"><b id="k5"></b><span>Mean patient age</span></div>
+    </div>
+  </div>
+  <div class="two">
+    <div class="card"><h2 class="lab-h">Admissions by month</h2><svg id="trend"></svg></div>
+    <div class="card"><h2 class="lab-h">Mean length of stay by ward</h2><svg id="byrep"></svg></div>
+  </div>
+  <div class="card">
+    <h2 class="lab-h">Indicators by ward</h2>
+    <div class="scroll"><table class="data" id="tab"></table></div>
+    <p class="note" style="margin-top:10px">Red marks values above the alert threshold: occupancy over 90% or readmissions over 10%.</p>
+  </div>
+</div>
+<p class="note">Fully synthetic data from a reproducible random model: no real patient, hospital or client. Occupancy = inpatient days / (beds × days in the period). Readmission = a new inpatient stay within 30 days of discharge.</p>
+<script>
+(() => {
+const $ = id => document.getElementById(id);
+const WARDS = [
+  { name: 'Internal medicine', short: 'Med', beds: 50, vol: 220, los: 8.5, age: 76, read: 0.11, dh: 0.05 },
+  { name: 'Cardiology', short: 'Card', beds: 30, vol: 150, los: 5.2, age: 70, read: 0.08, dh: 0.15 },
+  { name: 'General surgery', short: 'Surg', beds: 40, vol: 200, los: 4.6, age: 61, read: 0.06, dh: 0.30 },
+  { name: 'Orthopaedics', short: 'Orth', beds: 35, vol: 160, los: 5.8, age: 66, read: 0.04, dh: 0.25 },
+  { name: 'Pulmonology', short: 'Pulm', beds: 25, vol: 95, los: 9.6, age: 73, read: 0.12, dh: 0.08 },
+];
+const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+const SEASON = [1.18, 1.12, 1.02, 0.97, 0.95, 0.9, 0.85, 0.72, 0.95, 1.0, 1.08, 1.15];
+const ROWS = (() => {
+  const r = Lab.rng(2026), rows = []; let id = 1;
+  WARDS.forEach(w => { for (let m = 0; m < 12; m++) {
+    const n = Math.round(w.vol * SEASON[m] * (0.92 + 0.16 * r()));
+    for (let i = 0; i < n; i++) {
+      const dh = r() < w.dh, age = Math.max(18, Math.min(101, Math.round(Lab.normal(r, w.age, 12))));
+      const los = dh ? 0 : Math.max(1, Math.round(-Math.log(1 - r()) * w.los * (0.8 + (age - w.age) / 120) * (m < 2 || m > 10 ? 1.08 : 1)));
+      rows.push({ id: id++, ward: w.name, month: m, setting: dh ? 'Day hospital' : 'Inpatient', age, los, readm: !dh && r() < w.read * (age >= 80 ? 1.4 : 0.9) ? 1 : 0 });
+    }
+  } });
+  return rows;
+})();
+$('rep').innerHTML = '<option value="">All</option>' + WARDS.map(w => `<option>${w.name}</option>`).join('');
+function filt() {
+  const w = $('rep').value, s = $('reg').value, [lo, hi] = $('eta').value ? $('eta').value.split('-').map(Number) : [0, 200];
+  return ROWS.filter(x => (!w || x.ward === w) && (!s || x.setting === s) && x.age >= lo && x.age <= hi);
+}
+function kpi(rows, beds) {
+  const inp = rows.filter(r => r.setting === 'Inpatient'), days = inp.reduce((s, r) => s + r.los, 0);
+  return { n: rows.length, los: inp.length ? days / inp.length : NaN, occ: days / (beds * 365), read: inp.length ? inp.reduce((s, r) => s + r.readm, 0) / inp.length : NaN, age: rows.reduce((s, r) => s + r.age, 0) / rows.length };
+}
+function render() {
+  const rows = filt(), w = $('rep').value, beds = w ? WARDS.find(x => x.name === w).beds : WARDS.reduce((s, x) => s + x.beds, 0), k = kpi(rows, beds);
+  $('k1').textContent = Lab.int(k.n); $('k2').textContent = Lab.num(k.los, 1); $('k3').textContent = Lab.pct(k.occ, 0); $('k4').textContent = Lab.pct(k.read, 1); $('k5').textContent = isFinite(k.age) ? Math.round(k.age) : '–';
+  const bm = MONTHS.map((_, m) => rows.filter(r => r.month === m).length);
+  Lab.chart($('trend'), { series: [{ points: bm.map((v, m) => [m, v]), color: Lab.C.accent, area: true, dots: bm.map((v, m) => [m, v, 3.5]) }], xmin: 0, xmax: 11, ymin: 0, xticksAt: [0, 2, 4, 6, 8, 10], xfmt: v => MONTHS[v], width: 460, height: 300, ylab: 'Admissions' });
+  Lab.bars($('byrep'), { labels: WARDS.map(x => x.name.split(' ')[0]), short: WARDS.map(x => x.short), series: [{ values: WARDS.map(x => kpi(rows.filter(r => r.ward === x.name), 1).los || 0), color: Lab.C.second }], width: 460, height: 300, ylab: 'Days', yfmt: v => Lab.num(v, 1) });
+  $('tab').innerHTML = '<thead><tr><th>Ward</th><th>Beds</th><th>Admissions</th><th>Mean stay</th><th>Occupancy</th><th>30-day readm.</th></tr></thead><tbody>' + WARDS.map(x => {
+    const kk = kpi(rows.filter(r => r.ward === x.name), x.beds);
+    return `<tr><td>${x.name}</td><td>${x.beds}</td><td>${Lab.int(kk.n)}</td><td>${Lab.num(kk.los, 1)}</td><td class="${kk.occ > 0.9 ? 'flag' : ''}">${Lab.pct(kk.occ, 0)}</td><td class="${kk.read > 0.10 ? 'flag' : ''}">${Lab.pct(kk.read, 1)}</td></tr>`;
+  }).join('') + '</tbody>';
+}
+$('csv').addEventListener('click', () => {
+  const body = filt().map(r => [r.id, r.ward, MONTHS[r.month], r.setting, r.age, r.los, r.readm].join(',')).join('\n');
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(new Blob(['id,ward,month,setting,age,length_of_stay,readmission_30d\n' + body], { type: 'text/csv' }));
+  a.download = 'synthetic_admissions.csv'; a.click();
+});
+document.querySelectorAll('#ctl select').forEach(s => s.addEventListener('input', render));
+render(); Lab.onResize(render);
+})();
+</script>
+
+  </div>
+</section>
+
+<section class="section" style="padding-top:0">
+  <div class="wrap">
+    <footer>© 2026 Martina Castellucci · <a href="https://martinaa1408.github.io/">martinaa1408.github.io</a> · <a href="https://martinaa1408.github.io/privacy.html">Privacy Policy</a></footer>
+  </div>
+</section>
+</body>
+</html>

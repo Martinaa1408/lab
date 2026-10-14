@@ -1,0 +1,109 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>Lab • Martina Castellucci Lab</title>
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="description" content="Interactive tools for bioinformatics, clinical statistics, machine learning, food safety and teaching.">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="style.css">
+  <link rel="stylesheet" href="lab.css">
+  <script defer src="main.js"></script>
+  <script src="lab.js"></script>
+</head>
+<body>
+<header class="topbar">
+  <div class="wrap topbar__inner">
+    <a class="brand" href="index.html"><span class="brand__dot"></span><span>Martina Castellucci · Lab</span></a>
+    <nav class="nav">
+      <button class="nav__toggle" id="navToggle" aria-expanded="false">Menu</button>
+      <ul class="nav__menu" id="navMenu">
+        <li><a class="nav__link" href="index.html#bio">Bioinformatics</a></li>
+        <li><a class="nav__link" href="index.html#clinical">Clinical statistics</a></li>
+        <li><a class="nav__link" href="index.html#ai">AI</a></li>
+        <li><a class="nav__link" href="index.html#food">Food safety</a></li>
+        <li><a class="nav__link" href="index.html#school">Teaching</a></li>
+        <li><a class="nav__link" href="https://martinaa1408.github.io/">My website ↗</a></li>
+      </ul>
+    </nav>
+  </div>
+</header>
+
+<section class="lab-hero">
+  <div class="wrap">
+    <h1><span class="grad">Lab</span></h1>
+    <p class="subtitle">Interactive tools I built on the topics of my studies and work: bioinformatics, clinical statistics, machine learning, food safety and teaching. Everything runs in your browser, on simulated data or data you enter. Nothing is sent anywhere.</p>
+    <div class="lab-cats"><a class="chip" href="#bio">Bioinformatics</a><a class="chip" href="#clinical">Clinical statistics</a><a class="chip" href="#ai">AI and machine learning</a><a class="chip" href="#food">Food safety</a><a class="chip" href="#school">Teaching</a></div>
+    <p style="margin-top:14px"><a class="btn" href="https://martinaa1408.github.io/">About me: martinaa1408.github.io ↗</a></p>
+  </div>
+</section>
+
+<section class="section">
+  <div class="wrap">
+
+    <div class="lab-section" id="bio">
+      <h2>Bioinformatics</h2>
+      <p>Sequence analysis, alignment, phylogenetics, proteins and expression data.</p>
+      <div class="tools-list">
+        <a class="tool-card" href="sequence-toolkit.html"><b>DNA sequence toolkit</b><span>GC content, reverse complement, six-frame translation and ORF map for any nucleotide sequence.</span><small>GC skew window, ORF finder, codon table</small></a>
+        <a class="tool-card" href="pairwise-alignment.html"><b>Pairwise alignment</b><span>Needleman-Wunsch and Smith-Waterman with BLOSUM62 or DNA scoring, matrix and traceback shown.</span><small>Dynamic programming, BLOSUM62</small></a>
+        <a class="tool-card" href="phylogenetic-tree.html"><b>Phylogenetic tree</b><span>Distance matrix and UPGMA or neighbour-joining tree from your own aligned sequences.</span><small>p-distance, Jukes-Cantor, UPGMA, NJ</small></a>
+        <a class="tool-card" href="protein-properties.html"><b>Protein properties</b><span>Molecular weight, isoelectric point, extinction coefficient and Kyte-Doolittle hydropathy plot.</span><small>pI, GRAVY, hydropathy window</small></a>
+        <a class="tool-card" href="volcano-plot.html"><b>Volcano plot</b><span>Differential expression results on a volcano plot, with FDR correction and adjustable thresholds.</span><small>log2 fold change, Benjamini-Hochberg</small></a>
+      </div>
+    </div>
+
+    <div class="lab-section" id="clinical">
+      <h2>Clinical statistics</h2>
+      <p>Diagnostic tests, survival analysis, trial design and hospital indicators.</p>
+      <div class="tools-list">
+        <a class="tool-card" href="diagnostic-test.html"><b>Diagnostic test</b><span>Sensitivity, specificity and prevalence turned into predictive values, with a 500-person picture.</span><small>PPV, NPV, likelihood ratios</small></a>
+        <a class="tool-card" href="roc-curve.html"><b>ROC curve</b><span>Pick the cut-off of a blood biomarker and see sensitivity, specificity and the ROC curve move.</span><small>AUC, Youden index</small></a>
+        <a class="tool-card" href="survival.html"><b>Survival curves</b><span>Run a simulated two-arm trial as many times as you like and see when the effect becomes visible.</span><small>Kaplan-Meier, log-rank test, hazard ratio</small></a>
+        <a class="tool-card" href="sample-size.html"><b>Sample size</b><span>Patients needed for a two-group study, for binary or continuous outcomes, with drop-out.</span><small>Power, two proportions, two means</small></a>
+        <a class="tool-card" href="clinical-scores.html"><b>Clinical scores</b><span>Kidney function, stroke risk in atrial fibrillation, sepsis screening and BMI.</span><small>CKD-EPI 2021, CHA₂DS₂-VASc, qSOFA</small></a>
+        <a class="tool-card" href="hospital-dashboard.html"><b>Hospital dashboard</b><span>A one-year hospital dashboard on synthetic data, with filters and CSV download.</span><small>Length of stay, bed occupancy, readmissions</small></a>
+      </div>
+    </div>
+
+    <div class="lab-section" id="ai">
+      <h2>AI and machine learning</h2>
+      <p>How models learn, how they are evaluated, and why rare classes need care.</p>
+      <div class="tools-list">
+        <a class="tool-card" href="logistic-classifier.html"><b>Train a classifier</b><span>A logistic regression trained live in the browser by gradient descent, with train/test split and decision boundary.</span><small>Gradient descent, L2 regularisation, test-set metrics</small></a>
+        <a class="tool-card" href="kmeans-clustering.html"><b>k-means clustering</b><span>Step through k-means on simulated patient profiles and choose k with the elbow plot.</span><small>Unsupervised learning, k-means++, elbow method</small></a>
+        <a class="tool-card" href="rare-events-metrics.html"><b>Rare events: ROC vs PR</b><span>The same model scored with accuracy, ROC-AUC and PR-AUC as positives become rare.</span><small>Precision-recall, average precision, class imbalance</small></a>
+      </div>
+    </div>
+
+    <div class="lab-section" id="food">
+      <h2>Food safety</h2>
+      <p>Methods from my MSc thesis on food contamination risk, applied to invented data.</p>
+      <div class="tools-list">
+        <a class="tool-card" href="compliance-statistics.html"><b>Non-compliance statistics</b><span>Non-compliance rates with Wilson intervals and Fisher enrichment tests with FDR, for any contaminant-food table.</span><small>Wilson CI, Fisher exact test, Benjamini-Hochberg</small></a>
+        <a class="tool-card" href="trend-test.html"><b>Trend test</b><span>Mann-Kendall trend test and Sen's slope for any monthly series, such as non-compliance rates.</span><small>Mann-Kendall, Sen's slope</small></a>
+        <a class="tool-card" href="risk-alert-system.html"><b>Risk alert system</b><span>A decision-support demo that ranks contaminant-food pairs into risk tiers, inspired by my thesis.</span><small>Percentile ranking, composite score, minimum sample rule</small></a>
+      </div>
+    </div>
+
+    <div class="lab-section" id="school">
+      <h2>Teaching</h2>
+      <p>Classroom activities for health, food hygiene and biology lessons.</p>
+      <div class="tools-list">
+        <a class="tool-card" href="epidemic-simulator.html"><b>Epidemic simulator</b><span>SIR model with vaccination and contact reduction, for lessons on prevention and herd immunity.</span><small>SIR model, effective R, herd immunity</small></a>
+        <a class="tool-card" href="outbreak-investigation.html"><b>Food outbreak investigation</b><span>A classroom outbreak case with attack rates, relative risk, incubation and symptoms. A new case every time.</span><small>Attack rate, relative risk, food hygiene</small></a>
+        <a class="tool-card" href="mendelian-genetics.html"><b>Mendelian genetics</b><span>Punnett squares for one or two genes, simulated offspring and a chi-square goodness-of-fit test.</span><small>Punnett square, segregation, chi-square test</small></a>
+      </div>
+    </div>
+
+    <p class="note">These tools are for learning and demonstration. They are not medical devices and must not be used for clinical decisions. Simulated data do not describe real patients, hospitals, laboratories or companies.</p>
+  </div>
+</section>
+
+<section class="section" style="padding-top:0">
+  <div class="wrap">
+    <footer>© 2026 Martina Castellucci · <a href="https://martinaa1408.github.io/">martinaa1408.github.io</a> · <a href="https://martinaa1408.github.io/privacy.html">Privacy Policy</a></footer>
+  </div>
+</section>
+</body>
+</html>

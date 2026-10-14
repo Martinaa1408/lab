@@ -1,0 +1,159 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>Pairwise alignment • Martina Castellucci Lab</title>
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="description" content="Needleman-Wunsch and Smith-Waterman with BLOSUM62 or DNA scoring, matrix and traceback shown.">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="style.css">
+  <link rel="stylesheet" href="lab.css">
+  <script defer src="main.js"></script>
+  <script src="lab.js"></script>
+</head>
+<body>
+<header class="topbar">
+  <div class="wrap topbar__inner">
+    <a class="brand" href="index.html"><span class="brand__dot"></span><span>Martina Castellucci · Lab</span></a>
+    <nav class="nav">
+      <button class="nav__toggle" id="navToggle" aria-expanded="false">Menu</button>
+      <ul class="nav__menu" id="navMenu">
+        <li><a class="nav__link" href="index.html#bio">Bioinformatics</a></li>
+        <li><a class="nav__link" href="index.html#clinical">Clinical statistics</a></li>
+        <li><a class="nav__link" href="index.html#ai">AI</a></li>
+        <li><a class="nav__link" href="index.html#food">Food safety</a></li>
+        <li><a class="nav__link" href="index.html#school">Teaching</a></li>
+        <li><a class="nav__link" href="https://martinaa1408.github.io/">My website ↗</a></li>
+      </ul>
+    </nav>
+  </div>
+</header>
+
+<section class="lab-hero">
+  <div class="wrap">
+    <p class="crumb"><a href="index.html">Lab</a> / <a href="index.html#bio">Bioinformatics</a></p>
+    <h1>Aligning two sequences, step by step</h1>
+    <p class="subtitle">Dynamic programming finds the best alignment between two sequences. Choose global (Needleman-Wunsch) or local (Smith-Waterman), set the scores, and watch the score matrix and the traceback path.</p>
+  </div>
+</section>
+
+<section class="section">
+  <div class="wrap">
+<style>
+  .aln{ font-family: ui-monospace, Menlo, Consolas, monospace; font-size:14px; line-height:1.35; white-space:pre; overflow-x:auto; background:#f6f5fb; border:1px solid var(--border); border-radius:12px; padding:12px; }
+  .aln .id{ color:var(--lab-good); font-weight:700; }
+</style>
+<div class="tool">
+  <div class="card" id="ctl">
+    <label class="ctl">Sequence type
+      <select id="type"><option value="prot">Protein (BLOSUM62)</option><option value="dna">DNA (match / mismatch)</option></select></label>
+    <label class="ctl">Algorithm
+      <select id="mode"><option value="global">Global (Needleman-Wunsch)</option><option value="local">Local (Smith-Waterman)</option></select></label>
+    <label class="ctl" for="a">Sequence A<input type="text" id="a" value="HEAGAWGHEE" spellcheck="false"></label>
+    <label class="ctl" for="b">Sequence B<input type="text" id="b" value="PAWHEAE" spellcheck="false"></label>
+    <label class="ctl" for="gap">Gap penalty <span class="val" data-for="gap"></span>
+      <input type="range" id="gap" min="1" max="12" step="1" value="8"></label>
+    <div id="dnaBox" hidden>
+      <label class="ctl" for="ma">Match score <span class="val" data-for="ma"></span><input type="range" id="ma" min="1" max="5" step="1" value="2"></label>
+      <label class="ctl" for="mm">Mismatch penalty <span class="val" data-for="mm"></span><input type="range" id="mm" min="0" max="5" step="1" value="1"></label>
+    </div>
+    <div class="btns"><button class="btn" type="button" id="exP">Protein example</button><button class="btn" type="button" id="exD">DNA example</button></div>
+  </div>
+  <div class="stack">
+    <div class="card">
+      <div class="metrics">
+        <div class="metric"><b id="score"></b><span>Alignment score</span></div>
+        <div class="metric"><b id="ident"></b><span>Identity</span></div>
+        <div class="metric alt"><b id="gaps"></b><span>Gaps</span></div>
+        <div class="metric alt"><b id="alen"></b><span>Alignment length</span></div>
+      </div>
+    </div>
+    <div class="card">
+      <h2 class="lab-h">Best alignment</h2>
+      <div class="aln" id="aln"></div>
+      <p class="note" style="margin-top:8px">| identical, : similar (positive BLOSUM62 score), space different or gap.</p>
+    </div>
+    <div class="card">
+      <h2 class="lab-h">Score matrix and traceback</h2>
+      <div class="scroll"><svg id="mat"></svg></div>
+      <p class="note" id="matNote" style="margin-top:8px"></p>
+    </div>
+  </div>
+</div>
+<p class="note">Linear gap penalty; end gaps are penalised in global mode. Ties in the traceback prefer the diagonal. The protein pair is the classic example from Durbin et al., Biological Sequence Analysis (the book scores it with BLOSUM50, so its numbers differ). Scores match Biopython's PairwiseAligner.</p>
+<script>
+const AA = 'ARNDCQEGHILKMFPSTWYV';
+const B62 = (() => { const v = '4,-1,-2,-2,0,-1,-1,0,-2,-1,-1,-1,-1,-2,-1,1,0,-3,-2,0,-1,5,0,-2,-3,1,0,-2,0,-3,-2,2,-1,-3,-2,-1,-1,-3,-2,-3,-2,0,6,1,-3,0,0,0,1,-3,-3,0,-2,-3,-2,1,0,-4,-2,-3,-2,-2,1,6,-3,0,2,-1,-1,-3,-4,-1,-3,-3,-1,0,-1,-4,-3,-3,0,-3,-3,-3,9,-3,-4,-3,-3,-1,-1,-3,-1,-2,-3,-1,-1,-2,-2,-1,-1,1,0,0,-3,5,2,-2,0,-3,-2,1,0,-3,-1,0,-1,-2,-1,-2,-1,0,0,2,-4,2,5,-2,0,-3,-3,1,-2,-3,-1,0,-1,-3,-2,-2,0,-2,0,-1,-3,-2,-2,6,-2,-4,-4,-2,-3,-3,-2,0,-2,-2,-3,-3,-2,0,1,-1,-3,0,0,-2,8,-3,-3,-1,-2,-1,-2,-1,-2,-2,2,-3,-1,-3,-3,-3,-1,-3,-3,-4,-3,4,2,-3,1,0,-3,-2,-1,-3,-1,3,-1,-2,-3,-4,-1,-2,-3,-4,-3,2,4,-2,2,0,-3,-2,-1,-2,-1,1,-1,2,0,-1,-3,1,1,-2,-1,-3,-2,5,-1,-3,-1,0,-1,-3,-2,-2,-1,-1,-2,-3,-1,0,-2,-3,-2,1,2,-1,5,0,-2,-1,-1,-1,-1,1,-2,-3,-3,-3,-2,-3,-3,-3,-1,0,0,-3,0,6,-4,-2,-2,1,3,-1,-1,-2,-2,-1,-3,-1,-1,-2,-2,-3,-3,-1,-2,-4,7,-1,-1,-4,-3,-2,1,-1,1,0,-1,0,0,0,-1,-2,-2,0,-1,-2,-1,4,1,-3,-2,-2,0,-1,0,-1,-1,-1,-1,-2,-2,-1,-1,-1,-1,-2,-1,1,5,-2,-2,0,-3,-3,-4,-4,-2,-2,-3,-2,-2,-3,-2,-3,-1,1,-4,-3,-2,11,2,-3,-2,-2,-2,-3,-2,-1,-2,-3,2,-1,-1,-2,-1,3,-3,-2,-2,2,7,-1,0,-3,-3,-3,-1,-2,-2,-3,-3,3,1,-2,1,-1,-2,-2,0,-3,-1,4'.split(',').map(Number);
+  const m = {}; for (let i = 0; i < 20; i++) for (let j = 0; j < 20; j++) m[AA[i] + AA[j]] = v[i * 20 + j]; return m; })();
+function align(a, b, opt) {
+  const n = a.length, m = b.length, local = opt.mode === 'local', g = opt.gap;
+  const sc = (x, y) => opt.type === 'prot' ? (B62[x + y] ?? -4) : (x === y ? opt.ma : -opt.mm);
+  const S = Array.from({ length: n + 1 }, () => new Array(m + 1).fill(0));
+  for (let i = 1; i <= n; i++) S[i][0] = local ? 0 : -g * i;
+  for (let j = 1; j <= m; j++) S[0][j] = local ? 0 : -g * j;
+  let best = [n, m];
+  for (let i = 1; i <= n; i++) for (let j = 1; j <= m; j++) {
+    let v = Math.max(S[i - 1][j - 1] + sc(a[i - 1], b[j - 1]), S[i - 1][j] - g, S[i][j - 1] - g);
+    S[i][j] = local ? Math.max(0, v) : v;
+  }
+  if (local) { let bi = 0, bj = 0; for (let i = 0; i <= n; i++) for (let j = 0; j <= m; j++) if (S[i][j] > S[bi][bj]) { bi = i; bj = j; } best = [bi, bj]; }
+  let [i, j] = best, A = '', B = '';
+  const path = [[i, j]];
+  while (local ? (i > 0 && j > 0 && S[i][j] > 0) : (i > 0 || j > 0)) {
+    if (i > 0 && j > 0 && S[i][j] === S[i - 1][j - 1] + sc(a[i - 1], b[j - 1])) { A = a[i - 1] + A; B = b[j - 1] + B; i--; j--; }
+    else if (i > 0 && S[i][j] === S[i - 1][j] - g) { A = a[i - 1] + A; B = '-' + B; i--; }
+    else { A = '-' + A; B = b[j - 1] + B; j--; }
+    path.push([i, j]);
+  }
+  return { S, A, B, score: S[best[0]][best[1]], path, sc };
+}
+(() => {
+const $ = id => document.getElementById(id);
+function render() {
+  const type = $('type').value, clean = s => s.toUpperCase().replace(type === 'prot' ? /[^ARNDCQEGHILKMFPSTWYV]/g : /[^ACGT]/g, '');
+  $('dnaBox').hidden = type === 'prot';
+  const a = clean($('a').value).slice(0, 400), b = clean($('b').value).slice(0, 400);
+  if (!a || !b) { $('aln').textContent = 'Enter two valid sequences.'; return; }
+  const r = align(a, b, { type, mode: $('mode').value, gap: +$('gap').value, ma: +$('ma').value, mm: +$('mm').value });
+  let mid = '', idn = 0, gp = 0;
+  for (let k = 0; k < r.A.length; k++) {
+    const x = r.A[k], y = r.B[k];
+    if (x === '-' || y === '-') { mid += ' '; gp++; } else if (x === y) { mid += '|'; idn++; } else mid += r.sc(x, y) > 0 && type === 'prot' ? ':' : ' ';
+  }
+  $('score').textContent = r.score; $('ident').textContent = r.A.length ? `${idn}/${r.A.length} (${Lab.pct(idn / r.A.length, 0)})` : '–';
+  $('gaps').textContent = gp; $('alen').textContent = r.A.length;
+  let out = '';
+  for (let k = 0; k < r.A.length; k += 60) out += `A  ${r.A.slice(k, k + 60)}\n   ${r.B.length ? mid.slice(k, k + 60) : ''}\nB  ${r.B.slice(k, k + 60)}\n\n`;
+  $('aln').textContent = out.trim() || 'No local alignment with a positive score.';
+  const svg = $('mat'), n = a.length, m = b.length;
+  if (n > 45 || m > 45) { svg.innerHTML = ''; svg.removeAttribute('viewBox'); $('matNote').textContent = 'The matrix is drawn for sequences up to 45 residues.'; return; }
+  $('matNote').textContent = 'Each cell is the best score of an alignment ending there. The highlighted cells are the traceback path.';
+  const c = 26, W = (m + 2) * c, H = (n + 2) * c, vals = r.S.flat(), lo = Math.min(...vals), hi = Math.max(...vals);
+  const onPath = new Set(r.path.map(p => p.join(',')));
+  let s = '';
+  for (let j = 0; j < m; j++) s += `<text x="${(j + 2.5) * c}" y="${c * 0.7}" text-anchor="middle" font-weight="700">${b[j]}</text>`;
+  for (let i = 0; i < n; i++) s += `<text x="${c * 0.5}" y="${(i + 2.65) * c}" text-anchor="middle" font-weight="700">${a[i]}</text>`;
+  for (let i = 0; i <= n; i++) for (let j = 0; j <= m; j++) {
+    const v = r.S[i][j], t = (v - lo) / (hi - lo || 1), p = onPath.has(i + ',' + j);
+    s += `<rect x="${(j + 1) * c}" y="${(i + 1) * c}" width="${c - 1}" height="${c - 1}" rx="3" fill="${p ? '#7c5cff' : `rgba(124,92,255,${0.06 + 0.4 * t})`}"/>`;
+    s += `<text x="${(j + 1.5) * c - 0.5}" y="${(i + 1.62) * c}" text-anchor="middle" style="font-size:10px;fill:${p ? '#fff' : '#3b3d46'}">${v}</text>`;
+  }
+  svg.setAttribute('viewBox', `0 0 ${W} ${H}`); svg.setAttribute('class', 'chart');
+  svg.style.width = Math.min(W, 900) + 'px'; svg.style.maxWidth = 'none'; svg.innerHTML = s;
+}
+$('exP').addEventListener('click', () => { $('type').value = 'prot'; $('a').value = 'HEAGAWGHEE'; $('b').value = 'PAWHEAE'; $('gap').value = 8; $('gap').dispatchEvent(new Event('input')); });
+$('exD').addEventListener('click', () => { $('type').value = 'dna'; $('a').value = 'GATTACAGATTACA'; $('b').value = 'GCATGCGATTAC'; $('gap').value = 2; $('gap').dispatchEvent(new Event('input')); });
+Lab.bindRanges($('ctl'), render);
+})();
+</script>
+
+  </div>
+</section>
+
+<section class="section" style="padding-top:0">
+  <div class="wrap">
+    <footer>© 2026 Martina Castellucci · <a href="https://martinaa1408.github.io/">martinaa1408.github.io</a> · <a href="https://martinaa1408.github.io/privacy.html">Privacy Policy</a></footer>
+  </div>
+</section>
+</body>
+</html>

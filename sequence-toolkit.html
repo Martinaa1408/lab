@@ -1,0 +1,154 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>DNA sequence toolkit • Martina Castellucci Lab</title>
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="description" content="GC content, reverse complement, six-frame translation and ORF map for any nucleotide sequence.">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="style.css">
+  <link rel="stylesheet" href="lab.css">
+  <script defer src="main.js"></script>
+  <script src="lab.js"></script>
+</head>
+<body>
+<header class="topbar">
+  <div class="wrap topbar__inner">
+    <a class="brand" href="index.html"><span class="brand__dot"></span><span>Martina Castellucci · Lab</span></a>
+    <nav class="nav">
+      <button class="nav__toggle" id="navToggle" aria-expanded="false">Menu</button>
+      <ul class="nav__menu" id="navMenu">
+        <li><a class="nav__link" href="index.html#bio">Bioinformatics</a></li>
+        <li><a class="nav__link" href="index.html#clinical">Clinical statistics</a></li>
+        <li><a class="nav__link" href="index.html#ai">AI</a></li>
+        <li><a class="nav__link" href="index.html#food">Food safety</a></li>
+        <li><a class="nav__link" href="index.html#school">Teaching</a></li>
+        <li><a class="nav__link" href="https://martinaa1408.github.io/">My website ↗</a></li>
+      </ul>
+    </nav>
+  </div>
+</header>
+
+<section class="lab-hero">
+  <div class="wrap">
+    <p class="crumb"><a href="index.html">Lab</a> / <a href="index.html#bio">Bioinformatics</a></p>
+    <h1>Reading a DNA sequence</h1>
+    <p class="subtitle">Paste a nucleotide sequence, plain or FASTA. The toolkit computes composition and GC content, translates all six reading frames and finds open reading frames that could encode a protein.</p>
+  </div>
+</section>
+
+<section class="section">
+  <div class="wrap">
+<style>
+  .aa-M{ color:var(--lab-good); font-weight:800; } .aa-stop{ color:var(--lab-bad); font-weight:800; }
+</style>
+<div class="tool">
+  <div class="card" id="ctl">
+    <label class="ctl" for="seq">Sequence (plain or FASTA)
+      <textarea id="seq" spellcheck="false"></textarea></label>
+    <label class="ctl" for="minorf">Minimum ORF length <span class="val" data-for="minorf"></span>
+      <input type="range" id="minorf" min="10" max="200" step="5" value="30" data-unit=" aa"></label>
+    <label class="ctl" for="win">GC window <span class="val" data-for="win"></span>
+      <input type="range" id="win" min="20" max="300" step="10" value="60" data-unit=" bp"></label>
+    <button class="btn" id="rand" type="button">Generate a random sequence</button>
+  </div>
+  <div class="stack">
+    <div class="card">
+      <div class="metrics">
+        <div class="metric"><b id="len"></b><span>Length (bp)</span></div>
+        <div class="metric"><b id="gc"></b><span>GC content</span></div>
+        <div class="metric alt"><b id="norf"></b><span>ORFs found</span></div>
+        <div class="metric alt"><b id="tm"></b><span>Estimated melting temperature</span></div>
+      </div>
+      <p style="margin:12px 0 0"><span id="warn" class="tag warn" hidden></span></p>
+    </div>
+    <div class="card"><h2 class="lab-h">GC content along the sequence</h2><svg id="gcplot"></svg></div>
+    <div class="card">
+      <h2 class="lab-h">ORFs in the six reading frames</h2>
+      <svg id="orfmap"></svg>
+      <div class="scroll"><table class="data" id="orftab"></table></div>
+    </div>
+    <div class="card">
+      <h2 class="lab-h">Reverse complement</h2>
+      <div class="box mono" id="rc"></div>
+      <h2 class="lab-h" style="margin-top:16px">Translation of the longest ORF</h2>
+      <div class="box mono" id="prot"></div>
+    </div>
+  </div>
+</div>
+<p class="note">Standard genetic code (NCBI table 1). ORF = from ATG to the first in-frame stop codon. Tm by the Wallace rule below 14 bp and by the GC formula above. Everything runs in your browser.</p>
+<script>
+const CODE = (() => { const b = 'TCAG', aa = 'FFLLSSSSYY**CC*WLLLLPPPPHHQQRRRRIIIMTTTTNNKKSSRRVVVVAAAADDEEGGGG', t = {}; let i = 0;
+  for (const x of b) for (const y of b) for (const z of b) t[x + y + z] = aa[i++]; return t; })();
+const clean = s => s.split('\n').filter(l => !l.startsWith('>')).join('').toUpperCase().replace(/[^ACGTN]/g, '');
+const revcomp = s => s.split('').reverse().map(c => ({ A: 'T', T: 'A', C: 'G', G: 'C' }[c] || 'N')).join('');
+const translate = s => { let p = ''; for (let i = 0; i + 3 <= s.length; i += 3) p += CODE[s.slice(i, i + 3)] || 'X'; return p; };
+function findOrfs(seq, minAa) {
+  const out = [], L = seq.length;
+  [[seq, '+'], [revcomp(seq), '−']].forEach(([s, strand]) => {
+    for (let f = 0; f < 3; f++) {
+      const p = translate(s.slice(f)); let start = -1;
+      for (let i = 0; i < p.length; i++) {
+        if (start < 0 && p[i] === 'M') start = i;
+        if (start >= 0 && p[i] === '*') {
+          if (i - start >= minAa) { const a = f + start * 3, b = f + i * 3 + 3;
+            out.push({ strand, frame: f + 1, start: strand === '+' ? a + 1 : L - b + 1, end: strand === '+' ? b : L - a, aa: i - start, prot: p.slice(start, i) }); }
+          start = -1;
+        }
+      }
+    }
+  });
+  return out.sort((a, b) => b.aa - a.aa);
+}
+(() => {
+const $ = id => document.getElementById(id);
+let seedN = 5;
+function randomSeq() {
+  const r = Lab.rng(seedN++), n = 'ACGT', pick = () => n[Math.floor(r() * 4)];
+  let orf = 'ATG';
+  for (let i = 0; i < 120; i++) { let c; do { c = pick() + pick() + pick(); } while (CODE[c] === '*'); orf += c; }
+  orf += 'TAA';
+  let s = ''; for (let i = 0; i < 500; i++) s += i === 340 ? orf : pick();
+  return '>simulated_sequence\n' + s.match(/.{1,60}/g).join('\n');
+}
+function render() {
+  const seq = clean($('seq').value), L = seq.length, gcN = (seq.match(/[GC]/g) || []).length, at = (seq.match(/[AT]/g) || []).length;
+  $('len').textContent = Lab.int(L); $('gc').textContent = L ? Lab.pct(gcN / (gcN + at || 1)) : '–';
+  $('tm').textContent = !L ? '–' : L < 14 ? (2 * at + 4 * gcN) + ' °C' : Lab.num(64.9 + 41 * (gcN - 16.4) / L, 1) + ' °C';
+  const raw = $('seq').value.split('\n').filter(l => !l.startsWith('>')).join('').replace(/\s/g, ''), bad = raw.replace(/[ACGTNacgtn]/g, '').length;
+  $('warn').hidden = !bad; $('warn').textContent = `${bad} invalid characters ignored`;
+  const w = +$('win').value, pts = [];
+  for (let i = 0; i + w <= L; i += Math.max(1, Math.floor(w / 4))) pts.push([i + w / 2, (seq.slice(i, i + w).match(/[GC]/g) || []).length / w * 100]);
+  Lab.chart($('gcplot'), { series: [{ points: pts.length ? pts : [[0, 0]], color: Lab.C.accent, area: true }, { points: [[0, 50], [Math.max(L, 1), 50]], color: Lab.C.line, dash: '4 4', width: 1 }],
+    xmin: 0, xmax: Math.max(L, 1), ymin: 0, ymax: 100, xlab: 'Position (bp)', ylab: 'GC (%)', height: 240 });
+  const orfs = findOrfs(seq, +$('minorf').value);
+  $('norf').textContent = orfs.length;
+  const svg = $('orfmap'); svg.setAttribute('class', 'chart');
+  const W = Math.round(svg.getBoundingClientRect().width) || 640, lane = 24, H = 6 * lane + 16, ml = 40, X = x => ml + x / Math.max(L, 1) * (W - ml - 10);
+  let s = '';
+  ['+1', '+2', '+3', '−1', '−2', '−3'].forEach((lab, i) => { const y = 6 + i * lane; s += `<text x="4" y="${y + 15}">${lab}</text><line x1="${ml}" x2="${W - 10}" y1="${y + 11}" y2="${y + 11}" class="axis"/>`; });
+  orfs.forEach((o, k) => { const y = 6 + ((o.strand === '+' ? 0 : 3) + o.frame - 1) * lane;
+    s += `<rect x="${X(o.start - 1)}" y="${y + 3}" width="${Math.max(2, X(o.end) - X(o.start - 1))}" height="16" rx="4" fill="${k === 0 ? Lab.C.accent : Lab.C.soft}"><title>${o.aa} aa, ${o.start}–${o.end}</title></rect>`; });
+  svg.setAttribute('viewBox', `0 0 ${W} ${H}`); svg.innerHTML = s;
+  $('orftab').innerHTML = orfs.length ? '<thead><tr><th>Strand</th><th>Frame</th><th>Start</th><th>End</th><th>Amino acids</th></tr></thead><tbody>' +
+    orfs.slice(0, 10).map(o => `<tr><td>${o.strand}</td><td>${o.frame}</td><td>${o.start}</td><td>${o.end}</td><td>${o.aa}</td></tr>`).join('') + '</tbody>'
+    : '<tbody><tr><td>No ORF above the minimum length. Try lowering it.</td></tr></tbody>';
+  $('rc').textContent = revcomp(seq) || '–';
+  $('prot').innerHTML = orfs.length ? orfs[0].prot.replace(/^M/, '<span class="aa-M">M</span>') + '<span class="aa-stop">*</span>' : '–';
+}
+$('rand').addEventListener('click', () => { $('seq').value = randomSeq(); render(); });
+$('seq').value = randomSeq();
+Lab.bindRanges($('ctl'), render);
+})();
+</script>
+
+  </div>
+</section>
+
+<section class="section" style="padding-top:0">
+  <div class="wrap">
+    <footer>© 2026 Martina Castellucci · <a href="https://martinaa1408.github.io/">martinaa1408.github.io</a> · <a href="https://martinaa1408.github.io/privacy.html">Privacy Policy</a></footer>
+  </div>
+</section>
+</body>
+</html>
